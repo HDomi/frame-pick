@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "arrows",
+      "label": "화살표",
+      "items": [
+        { "id": "arrow_right", "name": "오른쪽", "path": "arrows/arrow_right.svg" },
+        { "id": "arrow_left", "name": "왼쪽", "path": "arrows/arrow_left.svg" },
+        { "id": "arrow_up", "name": "위", "path": "arrows/arrow_up.svg" },
+        { "id": "arrow_down", "name": "아래", "path": "arrows/arrow_down.svg" },
+        { "id": "arrow_curve", "name": "곡선", "path": "arrows/arrow_curve.svg" },
+        { "id": "circle_target", "name": "타겟", "path": "arrows/circle_target.svg" }
+      ]
+    },
+    {
+      "id": "marks",
+      "label": "강조",
+      "items": [
+        { "id": "exclamation", "name": "느낌표", "path": "marks/exclamation.svg" },
+        { "id": "question", "name": "물음표", "path": "marks/question.svg" },
+        { "id": "star_burst", "name": "별", "path": "marks/star_burst.svg" },
+        { "id": "lightning", "name": "번개", "path": "marks/lightning.svg" },
+        { "id": "speech_bubble", "name": "말풍선", "path": "marks/speech_bubble.svg" },
+        { "id": "plus_badge", "name": "플러스", "path": "marks/plus_badge.svg" }
+      ]
+    },
+    {
+      "id": "shapes",
+      "label": "도형",
+      "items": [
+        { "id": "round_rect", "name": "둥근사각", "path": "shapes/round_rect.svg" },
+        { "id": "ring", "name": "링", "path": "shapes/ring.svg" },
+        { "id": "oval", "name": "타원", "path": "shapes/oval.svg" },
+        { "id": "soft_spotlight", "name": "스포트", "path": "shapes/soft_spotlight.svg" }
+      ]
+    },
+    {
+      "id": "emoji",
+      "label": "이모지",
+      "items": [
+        { "id": "thumbs_up", "name": "좋아요", "path": "emoji/thumbs_up.svg", "license": "frame-pick" },
+        { "id": "fire", "name": "불", "path": "emoji/fire.svg", "license": "fluent-emoji-flat" },
+        { "id": "joy", "name": "웃음", "path": "emoji/joy.svg", "license": "fluent-emoji-flat" },
+        { "id": "open_mouth", "name": "놀람", "path": "emoji/open_mouth.svg", "license": "fluent-emoji-flat" },
+        { "id": "check", "name": "체크", "path": "emoji/check.svg", "license": "fluent-emoji-flat" },
+        { "id": "cross", "name": "엑스", "path": "emoji/cross.svg", "license": "fluent-emoji-flat" },
+        { "id": "heart", "name": "하트", "path": "emoji/heart.svg", "license": "fluent-emoji-flat" },
+        { "id": "star", "name": "별이모지", "path": "emoji/star.svg", "license": "fluent-emoji-flat" },
+        { "id": "party", "name": "파티", "path": "emoji/party.svg", "license": "fluent-emoji-flat" },
+        { "id": "thinking", "name": "생각", "path": "emoji/thinking.svg", "license": "fluent-emoji-flat" },
+        { "id": "angry", "name": "화남", "path": "emoji/angry.svg", "license": "fluent-emoji-flat" },
+        { "id": "cool", "name": "쿨", "path": "emoji/cool.svg", "license": "fluent-emoji-flat" }
+      ]
+    }
+  ]
+}

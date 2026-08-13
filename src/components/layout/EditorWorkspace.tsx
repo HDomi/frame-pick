@@ -6,8 +6,23 @@ import { MobileEditorSheet } from '@/components/layout/MobileEditorSheet'
 import { RightPanel } from '@/components/layout/RightPanel'
 import { ResizeHandle } from '@/components/ui'
 import { FramePickerDialog } from '@/components/video/FramePickerDialog'
+import { useCanvasEditLock } from '@/hooks/useCanvasEditLock'
 import { useIsMobileLayout } from '@/hooks/useMediaQuery'
 import { usePanelLayout } from '@/hooks/usePanelLayout'
+import { PANEL_RESIZE_EVENT } from '@/lib/constants'
+
+/**
+ * 패널 리사이즈 단계를 브로드캐스트한다.
+ * @param {'start' | 'end'} phase - 단계
+ * @returns {void}
+ */
+function emitPanelResize(phase: 'start' | 'end'): void {
+  window.dispatchEvent(
+    new CustomEvent(PANEL_RESIZE_EVENT, {
+      detail: { phase },
+    }),
+  )
+}
 
 /**
  * 에디터 워크스페이스
@@ -18,6 +33,7 @@ import { usePanelLayout } from '@/hooks/usePanelLayout'
 export function EditorWorkspace() {
   const isMobile = useIsMobileLayout()
   const { shellRef, layout, resizeLeftByDelta, resizeRightByDelta } = usePanelLayout()
+  useCanvasEditLock()
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -30,7 +46,11 @@ export function EditorWorkspace() {
             >
               <LeftToolbar />
             </div>
-            <ResizeHandle onDrag={resizeLeftByDelta} />
+            <ResizeHandle
+              onDrag={resizeLeftByDelta}
+              onDragStart={() => emitPanelResize('start')}
+              onDragEnd={() => emitPanelResize('end')}
+            />
           </>
         ) : null}
 
@@ -40,7 +60,11 @@ export function EditorWorkspace() {
 
         {!isMobile ? (
           <>
-            <ResizeHandle onDrag={resizeRightByDelta} />
+            <ResizeHandle
+              onDrag={resizeRightByDelta}
+              onDragStart={() => emitPanelResize('start')}
+              onDragEnd={() => emitPanelResize('end')}
+            />
             <div
               className="min-h-0 shrink-0 overflow-hidden border-l border-[var(--color-border)]"
               style={{ width: `${layout.rightPanelPct}%` }}

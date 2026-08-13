@@ -4,6 +4,7 @@ import {
   UPLOADED_IMAGE_LAYER_NAME,
   VIDEO_IMAGE_LAYER_ID,
   VIDEO_IMAGE_LAYER_NAME,
+  type ImageFitMode,
   type ImageSourceKind,
   isVideoImageObject,
 } from '@/lib/image-layer'
@@ -14,6 +15,7 @@ export type LayerAwareObject = FabricObject & {
   layerName?: string
   layerType?: LayerType
   imageSource?: ImageSourceKind
+  imageFit?: ImageFitMode
 }
 
 /**
@@ -124,14 +126,19 @@ export function ensureLayerMeta(object: FabricObject): LayerAwareObject {
 export function toEditorLayer(object: FabricObject): EditorLayer {
   const layerObject = ensureLayerMeta(object)
   const isBackground = layerObject.layerType === 'background'
+  const isLocked =
+    isBackground ||
+    object.lockMovementX === true ||
+    object.selectable === false
 
   return {
     id: layerObject.layerId!,
     name: layerObject.layerName!,
     type: layerObject.layerType!,
     visible: object.visible !== false,
-    locked: isBackground || object.selectable === false || object.evented === false,
+    locked: isLocked,
     deletable: !isBackground,
+    imageSource: layerObject.imageSource,
   }
 }
 

@@ -7,20 +7,23 @@ interface LayerRowProps {
   typeLabel: string
   active?: boolean
   visible?: boolean
+  locked?: boolean
   deletable?: boolean
   canMoveUp?: boolean
   canMoveDown?: boolean
   canToggleVisible?: boolean
+  canToggleLock?: boolean
   onSelect?: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   onDelete?: () => void
   onToggleVisible?: () => void
+  onToggleLock?: () => void
   className?: string
 }
 
 /**
- * 레이어 패널 한 줄 (선택/이동/삭제)
+ * 레이어 패널 한 줄 (선택/잠금/이동/삭제)
  * @param {LayerRowProps} props - 행 props
  * @returns {React.ReactElement} - 레이어 행
  */
@@ -29,15 +32,18 @@ export function LayerRow({
   typeLabel,
   active = false,
   visible = true,
+  locked = false,
   deletable = true,
   canMoveUp = true,
   canMoveDown = true,
   canToggleVisible = true,
+  canToggleLock = false,
   onSelect,
   onMoveUp,
   onMoveDown,
   onDelete,
   onToggleVisible,
+  onToggleLock,
   className,
 }: LayerRowProps) {
   return (
@@ -54,7 +60,7 @@ export function LayerRow({
           onClick={onSelect}
           className={cn(
             'min-w-0 flex-1 rounded px-1 py-1 text-left',
-            !visible && 'opacity-50',
+            (!visible || locked) && 'opacity-50',
           )}
         >
           <span className="block truncate text-sm text-[var(--color-text)]">{name}</span>
@@ -71,10 +77,19 @@ export function LayerRow({
               {visible ? '보' : '숨'}
             </IconButton>
           ) : null}
+          {canToggleLock && onToggleLock ? (
+            <IconButton
+              label={locked ? '잠금 해제' : '잠금'}
+              className="size-7 text-[10px]"
+              onClick={onToggleLock}
+            >
+              {locked ? '해' : '잠'}
+            </IconButton>
+          ) : null}
           <IconButton
             label="위로"
             className="size-7 text-xs"
-            disabled={!canMoveUp}
+            disabled={!canMoveUp || locked}
             onClick={onMoveUp}
           >
             ↑
@@ -82,13 +97,18 @@ export function LayerRow({
           <IconButton
             label="아래로"
             className="size-7 text-xs"
-            disabled={!canMoveDown}
+            disabled={!canMoveDown || locked}
             onClick={onMoveDown}
           >
             ↓
           </IconButton>
           {deletable ? (
-            <IconButton label="삭제" className="size-7 text-xs" onClick={onDelete}>
+            <IconButton
+              label="삭제"
+              className="size-7 text-xs"
+              disabled={locked}
+              onClick={onDelete}
+            >
               ×
             </IconButton>
           ) : (
@@ -96,7 +116,7 @@ export function LayerRow({
               className="inline-flex size-7 items-center justify-center text-[10px] text-[var(--color-text-muted)]"
               title="삭제 불가"
             >
-              잠
+              고
             </span>
           )}
         </div>

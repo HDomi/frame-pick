@@ -5,6 +5,10 @@ import { cn } from '@/lib/cn'
 interface ResizeHandleProps {
   orientation?: 'vertical' | 'horizontal'
   onDrag: (deltaPx: number) => void
+  /** 드래그 시작 (캔버스 fit 일시 중지 등) */
+  onDragStart?: () => void
+  /** 드래그 종료 시 (캔버스 fit 최종 동기화 등) */
+  onDragEnd?: () => void
   className?: string
 }
 
@@ -16,6 +20,8 @@ interface ResizeHandleProps {
 export function ResizeHandle({
   orientation = 'vertical',
   onDrag,
+  onDragStart,
+  onDragEnd,
   className,
 }: ResizeHandleProps) {
   /**
@@ -27,6 +33,7 @@ export function ResizeHandle({
     event.preventDefault()
     const target = event.currentTarget
     target.setPointerCapture(event.pointerId)
+    onDragStart?.()
 
     let last = orientation === 'vertical' ? event.clientX : event.clientY
 
@@ -52,6 +59,7 @@ export function ResizeHandle({
       target.releasePointerCapture(event.pointerId)
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
+      onDragEnd?.()
     }
 
     window.addEventListener('pointermove', handleMove)

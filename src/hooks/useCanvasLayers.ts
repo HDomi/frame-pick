@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FabricObject } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
 import { isBackgroundObject } from '@/lib/background-layer'
@@ -13,6 +13,21 @@ import {
 import type { EditorLayer } from '@/types/editor'
 
 /**
+ * Fabric 이미지 리소스를 정리한다.
+ * @param {FabricObject} object - 제거할 객체
+ * @returns {void}
+ */
+function disposeFabricObject(object: FabricObject): void {
+  try {
+    if (typeof (object as { dispose?: () => void }).dispose === 'function') {
+      ;(object as { dispose: () => void }).dispose()
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Fabric 객체와 레이어 패널을 동기화하는 훅
  * @returns 레이어 목록 및 조작 API
  */
@@ -20,9 +35,10 @@ export function useCanvasLayers() {
   const { canvas, isReady } = useCanvas()
   const [layers, setLayers] = useState<EditorLayer[]>([])
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null)
+  const syncFrameRef = useRef<number | null>(null)
 
   /**
-   * 캔버스 상태를 레이어 목록으로 동기화한다.
+   * 캔버스 상태를 레이어 목록으로 동기화한다. (rAF 배치)
    * @returns {void}
    */
   const syncLayers = useCallback(() => {
@@ -32,20 +48,27 @@ export function useCanvasLayers() {
       return
     }
 
-    const objects = canvas.getObjects()
-    objects.forEach((object) => {
-      ensureLayerMeta(object)
-    })
-
-    setLayers(listLayersFrontFirst(objects))
-
-    const active = canvas.getActiveObject() as LayerAwareObject | undefined
-    if (active && !Array.isArray(active)) {
-      const meta = ensureLayerMeta(active)
-      setSelectedLayerId(meta.layerId ?? null)
-    } else {
-      setSelectedLayerId(null)
+    if (syncFrameRef.current !== null) {
+      cancelAnimationFrame(syncFrameRef.current)
     }
+
+    syncFrameRef.current = requestAnimationFrame(() => {
+      syncFrameRef.current = null
+      const objects = canvas.getObjects()
+      objects.forEach((object) => {
+        ensureLayerMeta(object)
+      })
+
+      setLayers(listLayersFrontFirst(objects))
+
+      const active = canvas.getActiveObject() as LayerAwareObject | undefined
+      if (active && !Array.isArray(active)) {
+        const meta = ensureLayerMeta(active)
+        setSelectedLayerId(meta.layerId ?? null)
+      } else {
+        setSelectedLayerId(null)
+      }
+    })
   }, [canvas])
 
   useEffect(() => {
@@ -75,6 +98,9 @@ export function useCanvasLayers() {
       canvas.off('selection:created', handleSync)
       canvas.off('selection:updated', handleSync)
       canvas.off('selection:cleared', handleSync)
+      if (syncFrameRef.current !== null) {
+        cancelAnimationFrame(syncFrameRef.current)
+      }
     }
   }, [canvas, syncLayers])
 
@@ -107,6 +133,9 @@ export function useCanvasLayers() {
       if (!object) {
         return
       }
+      if (object.selectable === false && !isBackgroundObject(object)) {
+        return
+      }
       canvas.setActiveObject(object)
       canvas.requestRenderAll()
       syncLayers()
@@ -129,6 +158,7 @@ export function useCanvasLayers() {
         return
       }
       canvas.remove(object)
+      disposeFabricObject(object)
       canvas.discardActiveObject()
       canvas.requestRenderAll()
       syncLayers()
@@ -174,7 +204,6 @@ export function useCanvasLayers() {
 
       const objects = canvas.getObjects()
       const index = objects.indexOf(object)
-      // 배경(인덱스 0) 아래로 내려가지 않음
       if (index <= 1) {
         return
       }
@@ -207,7 +236,41 @@ export function useCanvasLayers() {
     [canvas, getObjectById, syncLayers],
   )
 
-  // Delete / Backspace로 선택 객체 삭제 (배경 제외)
+  /**
+   * 레이어 이동/변형 잠금을 토글한다. (배경 제외)
+   * @param {string} layerId - 레이어 ID
+   * @returns {void}
+   */
+  const toggleLayerLock = useCallback(
+    (layerId: string) => {
+      if (!canvas) {
+        return
+      }
+      const object = getObjectById(layerId)
+      if (!object || isBackgroundObject(object)) {
+        return
+      }
+
+      const nextLocked = object.selectable !== false
+      object.selectable = !nextLocked
+      object.evented = !nextLocked
+      object.lockMovementX = nextLocked
+      object.lockMovementY = nextLocked
+      object.lockScalingX = nextLocked
+      object.lockScalingY = nextLocked
+      object.lockRotation = nextLocked
+      object.hasControls = !nextLocked
+
+      if (nextLocked && canvas.getActiveObject() === object) {
+        canvas.discardActiveObject()
+      }
+
+      canvas.requestRenderAll()
+      syncLayers()
+    },
+    [canvas, getObjectById, syncLayers],
+  )
+
   useEffect(() => {
     if (!canvas) {
       return
@@ -234,8 +297,10 @@ export function useCanvasLayers() {
       if (!active || isBackgroundObject(active)) {
         return
       }
+      if (active.selectable === false) {
+        return
+      }
 
-      // 텍스트 편집 중 Backspace는 글자 삭제
       if (
         'isEditing' in active &&
         (active as { isEditing?: boolean }).isEditing &&
@@ -246,6 +311,7 @@ export function useCanvasLayers() {
 
       event.preventDefault()
       canvas.remove(active)
+      disposeFabricObject(active)
       canvas.discardActiveObject()
       canvas.requestRenderAll()
     }
@@ -265,6 +331,7 @@ export function useCanvasLayers() {
     moveLayerUp,
     moveLayerDown,
     toggleLayerVisible,
+    toggleLayerLock,
     syncLayers,
   }
 }

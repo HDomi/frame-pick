@@ -7,6 +7,7 @@ import { Button, PanelSection } from '@/components/ui'
 import { VideoUploader } from '@/components/video/VideoUploader'
 import { useLoading } from '@/contexts/LoadingContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useVideoSession } from '@/contexts/VideoSessionContext'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useCanvasImage } from '@/hooks/useCanvasImage'
 import { useCanvasText } from '@/hooks/useCanvasText'
@@ -19,17 +20,20 @@ export function LeftToolbar() {
   const { isReady } = useCanvas()
   const { addText } = useCanvasText()
   const { addUploadedImage } = useCanvasImage()
-  const { withLoading } = useLoading()
+  const { withLoading, isLoading } = useLoading()
+  const { isExtracting } = useVideoSession()
   const { toast } = useToast()
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const locked = isLoading || isExtracting
+  const toolsEnabled = isReady && !locked
 
   /**
    * 텍스트 추가 클릭
    * @returns {Promise<void>}
    */
   const handleAddText = async () => {
-    if (!isReady) {
-      toast({ message: '캔버스가 아직 준비되지 않았습니다.', variant: 'error' })
+    if (!toolsEnabled) {
+      toast({ message: '추출/처리 중에는 편집할 수 없습니다.', variant: 'info' })
       return
     }
     await addText()
@@ -41,8 +45,8 @@ export function LeftToolbar() {
    * @returns {void}
    */
   const handleImageUploadClick = () => {
-    if (!isReady) {
-      toast({ message: '캔버스가 아직 준비되지 않았습니다.', variant: 'error' })
+    if (!toolsEnabled) {
+      toast({ message: '추출/처리 중에는 편집할 수 없습니다.', variant: 'info' })
       return
     }
     imageInputRef.current?.click()
@@ -99,7 +103,7 @@ export function LeftToolbar() {
           variant="tool"
           size="lg"
           fullWidth
-          disabled={!isReady}
+          disabled={!toolsEnabled}
           onClick={handleImageUploadClick}
         >
           이미지 업로드
@@ -108,7 +112,13 @@ export function LeftToolbar() {
       </PanelSection>
 
       <PanelSection title="텍스트">
-        <Button variant="tool" size="lg" fullWidth disabled={!isReady} onClick={handleAddText}>
+        <Button
+          variant="tool"
+          size="lg"
+          fullWidth
+          disabled={!toolsEnabled}
+          onClick={handleAddText}
+        >
           텍스트 추가
         </Button>
       </PanelSection>

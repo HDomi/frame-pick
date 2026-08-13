@@ -22,4 +22,5 @@ export const CANVAS_JSON_PROPERTIES = [
   'layerName',
   'layerType',
   'imageSource',
+  'imageFit',
 ] as const

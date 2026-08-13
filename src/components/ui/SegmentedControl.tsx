@@ -15,6 +15,7 @@ interface SegmentedControlProps<T extends string> {
   onChange: (value: T) => void
   className?: string
   size?: 'sm' | 'md'
+  disabled?: boolean
 }
 
 /**
@@ -28,14 +29,17 @@ export function SegmentedControl<T extends string>({
   onChange,
   className,
   size = 'sm',
+  disabled = false,
 }: SegmentedControlProps<T>) {
   return (
     <div
       className={cn(
         'inline-flex rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-0.5',
+        disabled && 'opacity-60',
         className,
       )}
       role="group"
+      aria-disabled={disabled}
     >
       {options.map((option) => {
         const selected = option.value === value
@@ -46,6 +50,7 @@ export function SegmentedControl<T extends string>({
             selected={selected}
             size={size}
             title={option.title}
+            disabled={disabled}
             onClick={() => onChange(option.value)}
           >
             {option.label}

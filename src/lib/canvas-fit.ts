@@ -5,7 +5,8 @@ import { CANVAS_ASPECT_RATIO } from '@/lib/constants'
 
 /**
  * 컨테이너 너비에 맞춰 캔버스를 CSS로만 스케일한다.
- * 논리 해상도(1920×1080 등)와 객체 좌표는 그대로 유지한다.
+ * 논리 해상도가 이미 맞으면 setDimensions(buffer)를 다시 호출하지 않는다.
+ * (패널 리사이즈 틱마다 buffer reset → 깜빡임/이미지 유실 방지)
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {HTMLElement} container - 뷰포트 컨테이너
  * @param {number} logicalWidth - 논리 가로 해상도
@@ -23,23 +24,43 @@ export function fitCanvasToContainer(
 
   const logicalHeight = logicalWidth / CANVAS_ASPECT_RATIO
   const displayHeight = containerWidth / CANVAS_ASPECT_RATIO
+  const cssWidth = `${containerWidth}px`
+  const cssHeight = `${displayHeight}px`
 
-  // zoom으로 맞추면 export/미리보기 좌표가 어긋나므로 논리 해상도 유지 + CSS 스케일만 사용
-  canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
-  canvas.setZoom(1)
-  canvas.setDimensions({
-    width: logicalWidth,
-    height: logicalHeight,
-  })
-  canvas.setDimensions(
-    {
-      width: `${containerWidth}px`,
-      height: `${displayHeight}px`,
-    },
-    { cssOnly: true },
-  )
-  canvas.calcOffset()
-  canvas.requestRenderAll()
+  const needsLogicalReset =
+    Math.abs(canvas.getWidth() - logicalWidth) > 0.5 ||
+    Math.abs(canvas.getHeight() - logicalHeight) > 0.5
+
+  if (needsLogicalReset) {
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
+    canvas.setZoom(1)
+    canvas.setDimensions({
+      width: logicalWidth,
+      height: logicalHeight,
+    })
+  }
+
+  const lower = canvas.lowerCanvasEl
+  const upper = canvas.upperCanvasEl
+  const cssChanged =
+    lower.style.width !== cssWidth ||
+    lower.style.height !== cssHeight ||
+    upper?.style.width !== cssWidth ||
+    upper?.style.height !== cssHeight
+
+  if (cssChanged || needsLogicalReset) {
+    canvas.setDimensions(
+      {
+        width: cssWidth,
+        height: cssHeight,
+      },
+      { cssOnly: true },
+    )
+    canvas.calcOffset()
+    canvas.requestRenderAll()
+  } else {
+    canvas.calcOffset()
+  }
 }
 
 /**

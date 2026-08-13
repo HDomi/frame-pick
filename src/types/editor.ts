@@ -14,6 +14,8 @@ export interface EditorLayer {
   locked: boolean
   /** false면 UI/단축키에서 삭제 불가 (배경) */
   deletable: boolean
+  /** 이미지 출처 (영상/업로드) */
+  imageSource?: 'video' | 'upload'
 }
 
 /**

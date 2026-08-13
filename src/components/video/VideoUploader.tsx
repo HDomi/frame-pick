@@ -8,7 +8,14 @@ import { useVideoSession } from '@/contexts/VideoSessionContext'
  * @returns {React.ReactElement}
  */
 export function VideoUploader() {
-  const { hasVideo, videoName, uploadVideo, openDialog, clearVideo } = useVideoSession()
+  const {
+    hasVideo,
+    videoName,
+    uploadVideo,
+    openDialog,
+    clearVideo,
+    isExtracting,
+  } = useVideoSession()
 
   /**
    * 파일 선택 핸들러
@@ -18,7 +25,7 @@ export function VideoUploader() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
-    if (!file) {
+    if (!file || isExtracting) {
       return
     }
     void uploadVideo(file)
@@ -30,7 +37,8 @@ export function VideoUploader() {
         <button
           type="button"
           onClick={openDialog}
-          className="w-full rounded-md border border-[var(--color-accent)] bg-[var(--color-surface-raised)] px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface)]"
+          disabled={isExtracting}
+          className="w-full rounded-md border border-[var(--color-accent)] bg-[var(--color-surface-raised)] px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface)] disabled:opacity-60"
         >
           <span className="block text-sm font-medium text-[var(--color-text)]">
             업로드된 영상
@@ -39,20 +47,27 @@ export function VideoUploader() {
             {videoName}
           </span>
           <span className="mt-2 block text-[11px] text-[var(--color-accent)]">
-            클릭하여 추천 프레임 다시 선택
+            클릭하여 프레임 다시 선택 · 수동 시킹
           </span>
         </button>
       ) : null}
 
       <FileDropzone
         title={hasVideo ? '다른 영상 업로드' : '영상 업로드'}
-        description="MP4, WebM, MOV"
+        description="MP4(H.264) 권장 · WebM/MOV · 자동 0~90%"
         accept="video/mp4,video/webm,video/quicktime"
+        disabled={isExtracting}
         onChange={handleFileChange}
       />
 
       {hasVideo ? (
-        <Button variant="ghost" size="sm" fullWidth onClick={clearVideo}>
+        <Button
+          variant="ghost"
+          size="sm"
+          fullWidth
+          disabled={isExtracting}
+          onClick={clearVideo}
+        >
           영상 제거
         </Button>
       ) : null}

@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   trailingSlash: true,
+  transpilePackages: ['@bunnio/rembg-web', 'onnxruntime-web'],
 }
 
 export default nextConfig

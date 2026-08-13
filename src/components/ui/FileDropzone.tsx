@@ -18,12 +18,14 @@ export function FileDropzone({
   description,
   icon,
   className,
+  disabled,
   ...inputProps
 }: FileDropzoneProps) {
   return (
     <label
       className={cn(
         'flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-[var(--color-border)] bg-[var(--color-surface-raised)] px-3 py-4 text-center transition-colors hover:border-[var(--color-accent)]',
+        disabled && 'pointer-events-none cursor-not-allowed opacity-60',
         className,
       )}
     >
@@ -32,7 +34,7 @@ export function FileDropzone({
       {description ? (
         <span className="text-xs text-[var(--color-text-muted)]">{description}</span>
       ) : null}
-      <input type="file" className="hidden" {...inputProps} />
+      <input type="file" className="hidden" disabled={disabled} {...inputProps} />
     </label>
   )
 }

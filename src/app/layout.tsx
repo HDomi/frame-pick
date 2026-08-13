@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { BASE_PATH } from '@/lib/constants'
 import { notoSansKr } from '@/lib/editor-font'
 import './globals.css'
 
@@ -9,6 +10,15 @@ export const metadata: Metadata = {
   description:
     '서버 비용 없이 브라우저에서 영상 프레임을 추출하고 유튜브 썸네일을 편집하세요.',
   metadataBase: new URL(SITE_URL),
+  icons: {
+    icon: [
+      { url: `${BASE_PATH}/favicon.ico`, sizes: 'any' },
+      { url: `${BASE_PATH}/favicon.svg`, type: 'image/svg+xml' },
+      { url: `${BASE_PATH}/favicon-32.png`, sizes: '32x32', type: 'image/png' },
+      { url: `${BASE_PATH}/favicon-16.png`, sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [{ url: `${BASE_PATH}/apple-icon.png`, sizes: '180x180', type: 'image/png' }],
+  },
   openGraph: {
     title: 'Frame Pick | 유튜브 썸네일 에디터',
     description:

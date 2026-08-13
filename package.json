@@ -19,6 +19,7 @@
     "url": "https://github.com/HDomi/frame-pick/issues"
   },
   "dependencies": {
+    "@bunnio/rembg-web": "^1.0.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@h_domi/domi-indexed-sqlite": "1.0.1",
@@ -26,6 +27,7 @@
     "@mui/material": "^9.3.1",
     "fabric": "7.4.0",
     "next": "^16.3.0",
+    "onnxruntime-web": "1.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

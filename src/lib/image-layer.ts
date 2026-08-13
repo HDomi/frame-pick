@@ -1,5 +1,6 @@
 import type { Canvas, FabricImage } from 'fabric'
 import { ensureBackgroundLayer } from '@/lib/background-layer'
+import { DEFAULT_IMAGE_FIT } from '@/lib/constants'
 import type { LayerAwareObject } from '@/lib/layers'
 
 /** 영상 프레임용 단일 교체 레이어 ID */
@@ -13,9 +14,13 @@ export const UPLOADED_IMAGE_LAYER_NAME = '업로드된이미지'
 
 export type ImageSourceKind = 'video' | 'upload'
 
+/** 캔버스 대비 이미지 배치 방식 */
+export type ImageFitMode = 'cover' | 'contain' | 'stretch'
+
 export type ImageLayerObject = LayerAwareObject & {
   layerType: 'image'
   imageSource?: ImageSourceKind
+  imageFit?: ImageFitMode
 }
 
 /**
@@ -35,10 +40,53 @@ export function isVideoImageObject(
 }
 
 /**
- * 이미지가 캔버스를 cover로 채우도록 스케일·위치를 맞춘다.
+ * 이미지 fit 모드를 적용한다.
  * @param {FabricImage} image - Fabric 이미지
  * @param {number} canvasWidth - 논리 너비
  * @param {number} canvasHeight - 논리 높이
+ * @param {ImageFitMode} mode - fit 모드
+ * @returns {void}
+ */
+export function fitImageToCanvas(
+  image: FabricImage,
+  canvasWidth: number,
+  canvasHeight: number,
+  mode: ImageFitMode = DEFAULT_IMAGE_FIT,
+): void {
+  const element = image.getElement() as HTMLImageElement | HTMLCanvasElement
+  const naturalWidth = element.width || 1
+  const naturalHeight = element.height || 1
+
+  let scaleX = canvasWidth / naturalWidth
+  let scaleY = canvasHeight / naturalHeight
+
+  if (mode === 'cover') {
+    const scale = Math.max(scaleX, scaleY)
+    scaleX = scale
+    scaleY = scale
+  } else if (mode === 'contain') {
+    const scale = Math.min(scaleX, scaleY)
+    scaleX = scale
+    scaleY = scale
+  }
+  // stretch: scaleX/scaleY 그대로
+
+  image.set({
+    originX: 'center',
+    originY: 'center',
+    left: canvasWidth / 2,
+    top: canvasHeight / 2,
+    scaleX,
+    scaleY,
+  })
+  image.setCoords()
+}
+
+/**
+ * @deprecated fitImageToCanvas(..., 'cover') 사용
+ * @param {FabricImage} image - 이미지
+ * @param {number} canvasWidth - 너비
+ * @param {number} canvasHeight - 높이
  * @returns {void}
  */
 export function fitImageCover(
@@ -46,37 +94,30 @@ export function fitImageCover(
   canvasWidth: number,
   canvasHeight: number,
 ): void {
-  const element = image.getElement() as HTMLImageElement | HTMLCanvasElement
-  const naturalWidth = element.width || 1
-  const naturalHeight = element.height || 1
-  const scale = Math.max(canvasWidth / naturalWidth, canvasHeight / naturalHeight)
-
-  image.set({
-    originX: 'center',
-    originY: 'center',
-    left: canvasWidth / 2,
-    top: canvasHeight / 2,
-    scaleX: scale,
-    scaleY: scale,
-  })
-  image.setCoords()
+  fitImageToCanvas(image, canvasWidth, canvasHeight, 'cover')
 }
 
 /**
  * 이미지 레이어 메타를 적용한다.
  * @param {FabricImage} image - Fabric 이미지
- * @param {{ layerId: string; layerName: string; imageSource: ImageSourceKind }} meta - 메타
+ * @param {{ layerId: string; layerName: string; imageSource: ImageSourceKind; imageFit?: ImageFitMode }} meta - 메타
  * @returns {ImageLayerObject}
  */
 export function applyImageLayerMeta(
   image: FabricImage,
-  meta: { layerId: string; layerName: string; imageSource: ImageSourceKind },
+  meta: {
+    layerId: string
+    layerName: string
+    imageSource: ImageSourceKind
+    imageFit?: ImageFitMode
+  },
 ): ImageLayerObject {
   const layerObject = image as unknown as ImageLayerObject
   layerObject.layerId = meta.layerId
   layerObject.layerName = meta.layerName
   layerObject.layerType = 'image'
   layerObject.imageSource = meta.imageSource
+  layerObject.imageFit = meta.imageFit ?? DEFAULT_IMAGE_FIT
   return layerObject
 }
 
@@ -84,15 +125,21 @@ export function applyImageLayerMeta(
  * 영상이미지 레이어를 찾아 교체하거나 없으면 배경 바로 위에 추가한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {FabricImage} nextImage - 새 이미지
+ * @param {ImageFitMode} [fit] - fit 모드
  * @returns {ImageLayerObject}
  */
-export function upsertVideoImageLayer(canvas: Canvas, nextImage: FabricImage): ImageLayerObject {
+export function upsertVideoImageLayer(
+  canvas: Canvas,
+  nextImage: FabricImage,
+  fit: ImageFitMode = DEFAULT_IMAGE_FIT,
+): ImageLayerObject {
   ensureBackgroundLayer(canvas)
-  fitImageCover(nextImage, canvas.getWidth(), canvas.getHeight())
+  fitImageToCanvas(nextImage, canvas.getWidth(), canvas.getHeight(), fit)
   const layer = applyImageLayerMeta(nextImage, {
     layerId: VIDEO_IMAGE_LAYER_ID,
     layerName: VIDEO_IMAGE_LAYER_NAME,
     imageSource: 'video',
+    imageFit: fit,
   })
 
   const existing = canvas.getObjects().find((object) => {
@@ -106,7 +153,6 @@ export function upsertVideoImageLayer(canvas: Canvas, nextImage: FabricImage): I
     canvas.insertAt(index, layer)
   } else {
     canvas.add(layer)
-    // 배경 바로 위(인덱스 1)로 고정
     const objects = canvas.getObjects()
     const backgroundIndex = objects.findIndex(
       (object) => (object as LayerAwareObject).layerType === 'background',
@@ -122,26 +168,48 @@ export function upsertVideoImageLayer(canvas: Canvas, nextImage: FabricImage): I
 }
 
 /**
- * 업로드된이미지 레이어를 새로 추가한다. (영상이미지와 절대 병합하지 않음)
+ * 업로드된이미지 레이어를 새로 추가한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {FabricImage} image - 이미지
  * @param {string} layerId - 새 레이어 ID
+ * @param {ImageFitMode} [fit] - fit 모드
  * @returns {ImageLayerObject}
  */
 export function addUploadedImageLayer(
   canvas: Canvas,
   image: FabricImage,
   layerId: string,
+  fit: ImageFitMode = DEFAULT_IMAGE_FIT,
 ): ImageLayerObject {
   ensureBackgroundLayer(canvas)
-  fitImageCover(image, canvas.getWidth(), canvas.getHeight())
+  fitImageToCanvas(image, canvas.getWidth(), canvas.getHeight(), fit)
   const layer = applyImageLayerMeta(image, {
     layerId,
     layerName: UPLOADED_IMAGE_LAYER_NAME,
     imageSource: 'upload',
+    imageFit: fit,
   })
   canvas.add(layer)
   canvas.setActiveObject(layer)
   canvas.requestRenderAll()
   return layer
+}
+
+/**
+ * 선택(또는 지정) 이미지 레이어의 fit을 다시 적용한다.
+ * @param {Canvas} canvas - 캔버스
+ * @param {ImageLayerObject} object - 이미지 레이어
+ * @param {ImageFitMode} fit - fit 모드
+ * @returns {void}
+ */
+export function applyImageFitMode(
+  canvas: Canvas,
+  object: ImageLayerObject,
+  fit: ImageFitMode,
+): void {
+  fitImageToCanvas(object as unknown as FabricImage, canvas.getWidth(), canvas.getHeight(), fit)
+  object.imageFit = fit
+  object.set('dirty', true)
+  canvas.requestRenderAll()
+  canvas.fire('object:modified', { target: object })
 }

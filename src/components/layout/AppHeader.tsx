@@ -3,7 +3,8 @@
 import RedoIcon from '@mui/icons-material/Redo'
 import UndoIcon from '@mui/icons-material/Undo'
 import { PreviewModal } from '@/components/preview/PreviewModal'
-import { Button, IconButton, SegmentedControl } from '@/components/ui'
+import { HeaderMenu } from '@/components/layout/HeaderMenu'
+import { Button, HelpTip, IconButton, SegmentedControl } from '@/components/ui'
 import { useEditorSession } from '@/contexts/EditorSessionContext'
 import { useLoading } from '@/contexts/LoadingContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -105,9 +106,11 @@ export function AppHeader() {
     <>
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4">
         <div className="flex min-w-0 items-center gap-2">
+          <HeaderMenu />
           <span className="text-lg font-bold tracking-tight text-[var(--color-text)]">
             Frame Pick
           </span>
+          <HelpTip />
           <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">
             유튜브 썸네일 에디터
           </span>

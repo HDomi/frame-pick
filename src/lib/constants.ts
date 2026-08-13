@@ -1,5 +1,8 @@
-/** 영상에서 자동 추출할 프레임 개수 */
-export const FRAME_EXTRACT_COUNT = 10
+/** 영상에서 자동 추출할 프레임 개수 (그리드 UX 균형) */
+export const FRAME_EXTRACT_COUNT = 8
+
+/** 자동 샘플링 상한 비율 (끝 블랙/페이드 회피) */
+export const FRAME_SAMPLE_MAX_RATIO = 0.9
 
 /** PNG 다운로드 전 광고 모달 대기 시간 (ms) */
 export const DOWNLOAD_AD_DELAY_MS = 3000
@@ -21,3 +24,9 @@ export const DEFAULT_TEXT_FONT_SIZE = 96
 
 /** 16:9 비율 */
 export const CANVAS_ASPECT_RATIO = 16 / 9
+
+/** 이미지 배치 기본 fit */
+export const DEFAULT_IMAGE_FIT = 'cover' as const
+
+/** 좌/우 패널 리사이즈 중 캔버스 fit 일시 중지용 이벤트 */
+export const PANEL_RESIZE_EVENT = 'frame-pick:panel-resize'
