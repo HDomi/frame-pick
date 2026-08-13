@@ -1,4 +1,11 @@
-import { Rect, type Canvas, type FabricObject } from 'fabric'
+import { Gradient, Rect, type Canvas, type FabricObject } from 'fabric'
+import { getArtboardPadding, getWorkspaceSize } from '@/lib/artboard'
+import {
+  createFabricFill,
+  createSolidFill,
+  parseFabricFill,
+  type FillValue,
+} from '@/lib/fill-value'
 import type { LayerAwareObject } from '@/lib/layers'
 
 /** 배경 레이어 고정 ID — 절대 변경/삭제하지 않음 */
@@ -9,6 +16,30 @@ export const DEFAULT_BACKGROUND_FILL = '#1a1d24'
 
 export type BackgroundObject = LayerAwareObject & {
   layerType: 'background'
+}
+
+export type BackgroundFillInput = string | Gradient<'linear'> | FillValue
+
+/**
+ * 배경에 넣을 fill 값을 정규화한다.
+ * @param {unknown} fill
+ * @returns {string | Gradient<'linear'>}
+ */
+function resolveBackgroundFabricFill(fill: unknown): string | Gradient<'linear'> {
+  if (fill instanceof Gradient) {
+    return fill
+  }
+  if (typeof fill === 'string' && fill) {
+    return fill
+  }
+  if (fill && typeof fill === 'object' && 'mode' in fill) {
+    return createFabricFill(fill as FillValue)
+  }
+  // sync 시 기존 Gradient plain / 유지
+  if (fill && typeof fill === 'object' && 'colorStops' in fill) {
+    return createFabricFill(parseFabricFill(fill, DEFAULT_BACKGROUND_FILL))
+  }
+  return DEFAULT_BACKGROUND_FILL
 }
 
 /**
@@ -29,23 +60,27 @@ export function isBackgroundObject(object: FabricObject | null | undefined): boo
 /**
  * 배경 Rect에 잠금·메타 속성을 적용한다.
  * @param {Rect} rect - 배경 Rect
- * @param {number} width - 캔버스 논리 너비
- * @param {number} height - 캔버스 논리 높이
- * @param {string} [fill] - 채움 색
+ * @param {number} width - 아트보드 가로
+ * @param {number} height - 아트보드 세로
+ * @param {BackgroundFillInput} [fill] - 채움 (단색/그라데이션)
+ * @param {number} [left=0] - 아트보드 원점 x
+ * @param {number} [top=0] - 아트보드 원점 y
  * @returns {BackgroundObject}
  */
 export function applyBackgroundProps(
   rect: Rect,
   width: number,
   height: number,
-  fill: string = DEFAULT_BACKGROUND_FILL,
+  fill: BackgroundFillInput = DEFAULT_BACKGROUND_FILL,
+  left = 0,
+  top = 0,
 ): BackgroundObject {
   rect.set({
-    left: 0,
-    top: 0,
+    left,
+    top,
     width,
     height,
-    fill,
+    fill: resolveBackgroundFabricFill(fill),
     scaleX: 1,
     scaleY: 1,
     angle: 0,
@@ -76,17 +111,21 @@ export function applyBackgroundProps(
 
 /**
  * 새 배경 Rect를 생성한다.
- * @param {number} width - 논리 너비
- * @param {number} height - 논리 높이
- * @param {string} [fill] - 채움 색
+ * @param {number} width - 아트보드 가로
+ * @param {number} height - 아트보드 세로
+ * @param {BackgroundFillInput} [fill] - 채움
+ * @param {number} [left=0] - 원점 x
+ * @param {number} [top=0] - 원점 y
  * @returns {BackgroundObject}
  */
 export function createBackgroundRect(
   width: number,
   height: number,
-  fill: string = DEFAULT_BACKGROUND_FILL,
+  fill: BackgroundFillInput = DEFAULT_BACKGROUND_FILL,
+  left = 0,
+  top = 0,
 ): BackgroundObject {
-  return applyBackgroundProps(new Rect(), width, height, fill)
+  return applyBackgroundProps(new Rect(), width, height, fill, left, top)
 }
 
 /**
@@ -99,17 +138,61 @@ export function findBackgroundObject(canvas: Canvas): BackgroundObject | undefin
 }
 
 /**
- * 배경을 캔버스 크기에 맞추고 최하위로 고정한다.
+ * 캔버스 크기에서 아트보드 크기를 추론한다.
+ * @param {Canvas} canvas - Fabric 캔버스
+ * @returns {{ width: number; height: number; padding: number }}
+ */
+function inferArtboardFromCanvas(canvas: Canvas): {
+  width: number
+  height: number
+  padding: number
+} {
+  const width = canvas.getWidth()
+  const height = canvas.getHeight()
+  const background = findBackgroundObject(canvas)
+
+  if (background && (background.width ?? 0) > 100) {
+    const bw = background.width ?? width
+    const bh = background.height ?? height
+    const pad = getArtboardPadding(bw)
+    const workspace = getWorkspaceSize({ width: bw, height: bh })
+    if (Math.abs(width - workspace.width) < 2) {
+      return { width: bw, height: bh, padding: pad }
+    }
+    if (Math.abs((background.left ?? 0) - pad) < 2) {
+      return { width: bw, height: bh, padding: pad }
+    }
+  }
+
+  for (const candidate of [1920, 1280] as const) {
+    const pad = getArtboardPadding(candidate)
+    const artW = width - pad * 2
+    const artH = height - pad * 2
+    if (artW === candidate || Math.abs(artW - candidate) < 2) {
+      return { width: artW, height: artH, padding: pad }
+    }
+  }
+
+  return { width, height, padding: 0 }
+}
+
+/**
+ * 배경을 아트보드 크기에 맞추고 최하위로 고정한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {BackgroundObject} background - 배경 객체
  * @returns {void}
  */
 export function syncBackgroundToCanvas(canvas: Canvas, background: BackgroundObject): void {
-  const fill =
-    typeof background.fill === 'string' && background.fill
-      ? background.fill
-      : DEFAULT_BACKGROUND_FILL
-  applyBackgroundProps(background as unknown as Rect, canvas.getWidth(), canvas.getHeight(), fill)
+  const fill = resolveBackgroundFabricFill(background.fill)
+  const artboard = inferArtboardFromCanvas(canvas)
+  applyBackgroundProps(
+    background as unknown as Rect,
+    artboard.width,
+    artboard.height,
+    fill,
+    artboard.padding,
+    artboard.padding,
+  )
   canvas.sendObjectToBack(background)
   canvas.requestRenderAll()
 }
@@ -117,12 +200,12 @@ export function syncBackgroundToCanvas(canvas: Canvas, background: BackgroundObj
 /**
  * 배경 레이어가 없으면 생성하고, 있으면 크기·잠금·순서를 보정한다.
  * @param {Canvas} canvas - Fabric 캔버스
- * @param {string} [fallbackFill] - 신규 생성 시 색상
+ * @param {BackgroundFillInput} [fallbackFill] - 신규 생성 시 채움
  * @returns {BackgroundObject}
  */
 export function ensureBackgroundLayer(
   canvas: Canvas,
-  fallbackFill: string = DEFAULT_BACKGROUND_FILL,
+  fallbackFill: BackgroundFillInput = DEFAULT_BACKGROUND_FILL,
 ): BackgroundObject {
   const existing = findBackgroundObject(canvas)
   if (existing) {
@@ -130,10 +213,13 @@ export function ensureBackgroundLayer(
     return existing
   }
 
+  const artboard = inferArtboardFromCanvas(canvas)
   const background = createBackgroundRect(
-    canvas.getWidth(),
-    canvas.getHeight(),
+    artboard.width,
+    artboard.height,
     fallbackFill,
+    artboard.padding,
+    artboard.padding,
   )
   canvas.add(background)
   canvas.sendObjectToBack(background)
@@ -142,27 +228,42 @@ export function ensureBackgroundLayer(
 }
 
 /**
- * 배경 채움 색을 반환한다.
- * @param {Canvas} canvas - Fabric 캔버스
- * @returns {string}
+ * 배경 채움(UI용 FillValue)을 반환한다.
+ * @param {Canvas} canvas
+ * @returns {FillValue}
  */
-export function getBackgroundFill(canvas: Canvas): string {
+export function getBackgroundFillValue(canvas: Canvas): FillValue {
   const background = findBackgroundObject(canvas)
-  if (background && typeof background.fill === 'string' && background.fill) {
-    return background.fill
+  if (!background) {
+    return createSolidFill(DEFAULT_BACKGROUND_FILL)
   }
-  return DEFAULT_BACKGROUND_FILL
+  return parseFabricFill(background.fill, DEFAULT_BACKGROUND_FILL)
 }
 
 /**
- * 배경 채움 색을 설정한다.
+ * 배경 채움 색을 반환한다. (단색 호환 — 그라데이션이면 시작색)
  * @param {Canvas} canvas - Fabric 캔버스
- * @param {string} fill - hex 색상
+ * @returns {string}
+ * @deprecated getBackgroundFillValue 사용
+ */
+export function getBackgroundFill(canvas: Canvas): string {
+  const value = getBackgroundFillValue(canvas)
+  return value.mode === 'solid' ? value.color : value.colorA
+}
+
+/**
+ * 배경 채움을 설정한다.
+ * @param {Canvas} canvas
+ * @param {BackgroundFillInput} fill
  * @returns {void}
  */
-export function setBackgroundFill(canvas: Canvas, fill: string): void {
-  const background = ensureBackgroundLayer(canvas, fill)
-  background.set('fill', fill)
+export function setBackgroundFill(canvas: Canvas, fill: BackgroundFillInput): void {
+  const fabricFill = resolveBackgroundFabricFill(fill)
+  const background = ensureBackgroundLayer(
+    canvas,
+    typeof fabricFill === 'string' ? fabricFill : DEFAULT_BACKGROUND_FILL,
+  )
+  background.set('fill', fabricFill)
   background.set('dirty', true)
   canvas.requestRenderAll()
   canvas.fire('object:modified', { target: background })

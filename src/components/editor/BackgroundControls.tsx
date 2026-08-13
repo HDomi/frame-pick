@@ -1,11 +1,12 @@
 'use client'
 
-import { ColorPicker } from '@/components/ui'
+import { FillPicker } from '@/components/ui'
 import { useBackgroundLayer } from '@/hooks/useBackgroundLayer'
 import { useRecentColors } from '@/hooks/useRecentColors'
+import type { FillValue } from '@/lib/fill-value'
 
 /**
- * 캔버스 배경 색상 컨트롤 (배경은 삭제 불가)
+ * 캔버스 배경 채움 컨트롤 (배경은 삭제 불가)
  * @returns {React.ReactElement}
  */
 export function BackgroundControls() {
@@ -13,23 +14,28 @@ export function BackgroundControls() {
   const { recentColors, rememberColor } = useRecentColors()
 
   /**
-   * 배경 색상 변경
-   * @param {string} hex - hex 색상
+   * 배경 채움 변경
+   * @param {FillValue} next
    * @returns {void}
    */
-  const handleColorChange = (hex: string) => {
-    applyFill(hex)
-    void rememberColor(hex)
+  const handleFillChange = (next: FillValue) => {
+    applyFill(next)
+    if (next.mode === 'solid') {
+      void rememberColor(next.color)
+    } else {
+      void rememberColor(next.colorA)
+      void rememberColor(next.colorB)
+    }
   }
 
   return (
-    <ColorPicker
-      label="배경 색상"
+    <FillPicker
+      label="배경 채움"
       value={fill}
       recentColors={recentColors}
       disabled={!isReady}
-      helperText="배경은 삭제할 수 없습니다. 색상만 변경할 수 있습니다."
-      onChange={handleColorChange}
+      helperText="배경은 삭제할 수 없습니다. 단색·그라데이션만 변경할 수 있습니다."
+      onChange={handleFillChange}
     />
   )
 }

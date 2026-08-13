@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { IText, Textbox, type FabricObject } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
-import { normalizeHexColor } from '@/lib/color-repository'
+import {
+  createFabricFill,
+  createSolidFill,
+  parseFabricFill,
+  type FillValue,
+} from '@/lib/fill-value'
 
 type TextObject = IText | Textbox
 
@@ -20,12 +25,12 @@ function isTextObject(object: FabricObject | null | undefined): object is TextOb
 }
 
 /**
- * 활성 텍스트의 채움색/부분 선택 색상 훅
- * @returns 텍스트 색상 API
+ * 활성 텍스트의 채움(단색/그라데이션)·부분 선택 훅
+ * @returns 텍스트 채움 API
  */
 export function useTextFill() {
   const { canvas } = useCanvas()
-  const [fill, setFill] = useState('#ffffff')
+  const [fill, setFill] = useState<FillValue>(createSolidFill('#ffffff'))
   const [hasTextTarget, setHasTextTarget] = useState(false)
   const [hasSelection, setHasSelection] = useState(false)
 
@@ -58,14 +63,12 @@ export function useTextFill() {
 
     if (selectionActive) {
       const styles = active.getSelectionStyles(active.selectionStart, active.selectionEnd, true)
-      const firstFill = styles.find((style) => typeof style.fill === 'string')?.fill
-      const next = normalizeHexColor(String(firstFill ?? active.fill ?? '#ffffff'))
-      setFill(next ?? '#ffffff')
+      const firstFill = styles.find((style) => style.fill != null)?.fill
+      setFill(parseFabricFill(firstFill ?? active.fill, '#ffffff'))
       return
     }
 
-    const next = normalizeHexColor(String(active.fill ?? '#ffffff'))
-    setFill(next ?? '#ffffff')
+    setFill(parseFabricFill(active.fill, '#ffffff'))
   }, [canvas])
 
   useEffect(() => {
@@ -99,17 +102,13 @@ export function useTextFill() {
   }, [canvas, syncFromCanvas])
 
   /**
-   * 선택 글자 또는 전체 텍스트 색상을 변경한다.
-   * @param {string} hexInput - 색상
-   * @returns {boolean} - 적용 성공 여부
+   * 선택 글자 또는 전체 텍스트 채움을 변경한다.
+   * @param {FillValue} next - 단색/그라데이션
+   * @returns {boolean}
    */
   const applyFill = useCallback(
-    (hexInput: string) => {
+    (next: FillValue) => {
       if (!canvas) {
-        return false
-      }
-      const hex = normalizeHexColor(hexInput)
-      if (!hex) {
         return false
       }
 
@@ -124,28 +123,52 @@ export function useTextFill() {
         typeof active.selectionEnd === 'number' &&
         active.selectionStart !== active.selectionEnd
 
+      // 부분 선택은 단색만
       if (selectionActive) {
+        const solid =
+          next.mode === 'solid' ? next.color : next.mode === 'gradient' ? next.colorA : '#ffffff'
         active.setSelectionStyles(
-          { fill: hex },
+          { fill: solid },
           active.selectionStart,
           active.selectionEnd,
         )
-      } else {
-        active.set('fill', hex)
-        // 부분 스타일이 남아 전체를 덮는 경우 초기화 후 통일
-        if (active.styles && Object.keys(active.styles).length > 0) {
-          const len = active.text?.length ?? 0
-          if (len > 0) {
-            active.setSelectionStyles({ fill: hex }, 0, len)
+        active.set('dirty', true)
+        canvas.requestRenderAll()
+        canvas.fire('object:modified', { target: active })
+        setFill(createSolidFill(solid))
+        setHasSelection(true)
+        return true
+      }
+
+      const fabricFill = createFabricFill(next)
+      active.set('fill', fabricFill)
+
+      // 부분 스타일 fill이 그라데이션을 덮지 않도록 제거
+      if (next.mode === 'gradient' && active.styles) {
+        for (const lineKey of Object.keys(active.styles)) {
+          const line = active.styles[Number(lineKey)]
+          if (!line) {
+            continue
           }
+          for (const charKey of Object.keys(line)) {
+            const style = line[Number(charKey)]
+            if (style && 'fill' in style) {
+              delete style.fill
+            }
+          }
+        }
+      } else if (active.styles && Object.keys(active.styles).length > 0) {
+        const len = active.text?.length ?? 0
+        if (len > 0 && next.mode === 'solid') {
+          active.setSelectionStyles({ fill: next.color }, 0, len)
         }
       }
 
       active.set('dirty', true)
       canvas.requestRenderAll()
       canvas.fire('object:modified', { target: active })
-      setFill(hex)
-      setHasSelection(selectionActive)
+      setFill(next)
+      setHasSelection(false)
       return true
     },
     [canvas],

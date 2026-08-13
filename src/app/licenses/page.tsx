@@ -27,8 +27,8 @@ export default function LicensesPage() {
           <strong>onnxruntime-web</strong> — MIT
         </li>
         <li>
-          <strong>u2netp.onnx</strong> 모델 — rembg/U²-Net 계열 공개 가중치 (프로젝트 문서 및
-          원 배포처 라이선스 참고)
+          <strong>u2netp.onnx</strong> / <strong>silueta.onnx</strong> 모델 — rembg/U²-Net
+          계열 공개 가중치 (프로젝트 문서 및 원 배포처 라이선스 참고)
         </li>
       </ul>
 

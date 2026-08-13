@@ -1,10 +1,11 @@
 'use client'
 
-import { Button, ColorPicker, FormField } from '@/components/ui'
+import { Button, ColorPicker, FillPicker, FormField } from '@/components/ui'
 import { useRecentColors } from '@/hooks/useRecentColors'
 import { useTextFill } from '@/hooks/useTextFill'
 import { useTextStyle } from '@/hooks/useTextStyle'
 import { EDITOR_FONT_FAMILY } from '@/lib/editor-font'
+import type { FillValue } from '@/lib/fill-value'
 import { TEXT_PRESET_CATEGORIES } from '@/lib/text-presets'
 import { cn } from '@/lib/cn'
 
@@ -18,15 +19,22 @@ export function TextControls() {
   const { recentColors, rememberColor } = useRecentColors()
 
   /**
-   * 채움색 변경
-   * @param {string} hex - 색상
+   * 채움 변경
+   * @param {FillValue} next
    * @returns {void}
    */
-  const handleColorChange = (hex: string) => {
-    const applied = applyFill(hex)
-    if (applied) {
-      void rememberColor(hex)
-      applyStylePatch({ fill: hex })
+  const handleFillChange = (next: FillValue) => {
+    const applied = applyFill(next)
+    if (!applied) {
+      return
+    }
+    if (next.mode === 'solid') {
+      void rememberColor(next.color)
+      applyStylePatch({ fill: next.color })
+    } else {
+      void rememberColor(next.colorA)
+      void rememberColor(next.colorB)
+      applyStylePatch({ fill: next.colorA })
     }
   }
 
@@ -140,19 +148,20 @@ export function TextControls() {
         </div>
       </FormField>
 
-      <ColorPicker
-        label={hasSelection ? '선택 글자 색상' : '텍스트 색상'}
+      <FillPicker
+        label={hasSelection ? '선택 글자 채움' : '텍스트 채움'}
         value={fill}
         recentColors={recentColors}
         disabled={!hasTextTarget}
+        allowGradient={!hasSelection}
         helperText={
           hasTextTarget
             ? hasSelection
-              ? '선택한 글자에만 색상이 적용됩니다.'
+              ? '선택한 글자에만 단색이 적용됩니다.'
               : '텍스트를 더블클릭한 뒤 글자를 드래그하면 일부만 색칠할 수 있습니다.'
             : '캔버스에서 텍스트 레이어를 선택하거나 프리셋을 누르세요.'
         }
-        onChange={handleColorChange}
+        onChange={handleFillChange}
       />
     </div>
   )

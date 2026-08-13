@@ -17,6 +17,8 @@ import {
   type CanvasSizeId,
 } from '@/lib/canvas-size'
 import { applyCanvasSize } from '@/lib/canvas-fit'
+import { ensureWorkspaceLayout, WORKSPACE_BG } from '@/lib/image-sticker'
+import { ensureBackgroundLayer } from '@/lib/background-layer'
 
 interface CanvasContextValue {
   canvas: Canvas | null
@@ -66,9 +68,9 @@ export function CanvasProvider({ children }: CanvasProviderProps) {
       if (prevId === nextId) {
         if (options?.skipObjectScale && canvas) {
           const size = getCanvasSizeById(nextId)
-          canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
-          canvas.setZoom(1)
-          canvas.setDimensions({ width: size.width, height: size.height })
+          ensureWorkspaceLayout(canvas, size)
+          ensureBackgroundLayer(canvas)
+          canvas.backgroundColor = WORKSPACE_BG
         }
         return
       }
@@ -77,12 +79,9 @@ export function CanvasProvider({ children }: CanvasProviderProps) {
 
       if (canvas) {
         if (options?.skipObjectScale) {
-          canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
-          canvas.setZoom(1)
-          canvas.setDimensions({
-            width: nextSize.width,
-            height: nextSize.height,
-          })
+          ensureWorkspaceLayout(canvas, nextSize)
+          ensureBackgroundLayer(canvas)
+          canvas.backgroundColor = WORKSPACE_BG
         } else {
           applyCanvasSize(canvas, nextSize, getCanvasSizeById(prevId))
         }

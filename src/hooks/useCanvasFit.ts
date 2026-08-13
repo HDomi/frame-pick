@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import type { Canvas } from 'fabric'
 import { fitCanvasToContainer } from '@/lib/canvas-fit'
-import { PANEL_RESIZE_EVENT } from '@/lib/constants'
+import { getWorkspaceSize } from '@/lib/artboard'
 
 /** 패널 드래그 중 ResizeObserver 폭주 완화 */
 const FIT_DEBOUNCE_MS = 48
@@ -12,18 +12,21 @@ type PanelResizeDetail = {
   phase: 'start' | 'end'
 }
 
+import { PANEL_RESIZE_EVENT } from '@/lib/constants'
+
 /**
- * 컨테이너 리사이즈에 맞춰 캔버스 표시 크기를 동기화한다.
- * 패널 드래그 중에는 fit을 멈추고, 종료 시 한 번만 맞춘다.
+ * 컨테이너 리사이즈에 맞춰 워크스페이스 표시 크기를 동기화한다.
  * @param {Canvas | null} canvas - Fabric 캔버스
  * @param {React.RefObject<HTMLElement | null>} containerRef - 뷰포트 컨테이너 ref
- * @param {number} logicalWidth - 논리 가로 해상도
+ * @param {number} artboardWidth - 아트보드 가로
+ * @param {number} artboardHeight - 아트보드 세로
  * @returns {void}
  */
 export function useCanvasFit(
   canvas: Canvas | null,
   containerRef: React.RefObject<HTMLElement | null>,
-  logicalWidth: number,
+  artboardWidth: number,
+  artboardHeight: number,
 ): void {
   const timerRef = useRef<number | null>(null)
   const lastWidthRef = useRef(0)
@@ -34,6 +37,8 @@ export function useCanvasFit(
     if (!canvas || !container) {
       return
     }
+
+    const workspace = getWorkspaceSize({ width: artboardWidth, height: artboardHeight })
 
     /**
      * fit을 즉시 실행한다.
@@ -47,7 +52,7 @@ export function useCanvasFit(
         return
       }
       lastWidthRef.current = width
-      fitCanvasToContainer(canvas, container, logicalWidth)
+      fitCanvasToContainer(canvas, container, workspace.width, workspace.height)
     }
 
     /**
@@ -106,5 +111,5 @@ export function useCanvasFit(
         window.clearTimeout(timerRef.current)
       }
     }
-  }, [canvas, containerRef, logicalWidth])
+  }, [canvas, containerRef, artboardWidth, artboardHeight])
 }

@@ -1,9 +1,11 @@
 import type { Canvas } from 'fabric'
 import type { CanvasSizeId } from '@/lib/canvas-size'
 import { getCanvasSizeById } from '@/lib/canvas-size'
+import { getWorkspaceSize } from '@/lib/artboard'
 import { ensureBackgroundLayer, isBackgroundObject } from '@/lib/background-layer'
 import { fitCanvasToContainer } from '@/lib/canvas-fit'
 import { CANVAS_JSON_PROPERTIES } from '@/lib/editor-persist-constants'
+import { ensureWorkspaceLayout } from '@/lib/image-sticker'
 
 export interface EditorSnapshot {
   sizeId: CanvasSizeId
@@ -30,7 +32,11 @@ export function createEditorSnapshot(canvas: Canvas, sizeId: CanvasSizeId): Edit
  * @param {string} canvasJson - 직렬화된 JSON 문자열
  * @returns {Promise<void>}
  */
-export async function applyCanvasJson(canvas: Canvas, canvasJson: string): Promise<void> {
+export async function applyCanvasJson(
+  canvas: Canvas,
+  canvasJson: string,
+  sizeId?: CanvasSizeId,
+): Promise<void> {
   const parsed = JSON.parse(canvasJson) as object
   await canvas.loadFromJSON(parsed)
 
@@ -39,6 +45,10 @@ export async function applyCanvasJson(canvas: Canvas, canvasJson: string): Promi
     object.set('dirty', true)
   })
 
+  const artboard = sizeId
+    ? getCanvasSizeById(sizeId)
+    : { width: 1920, height: 1080 }
+  ensureWorkspaceLayout(canvas, artboard)
   ensureBackgroundLayer(canvas)
 
   canvas.discardActiveObject()
@@ -55,12 +65,13 @@ export async function applyCanvasJson(canvas: Canvas, canvasJson: string): Promi
  */
 export function refitCanvasDisplay(canvas: Canvas, sizeId: CanvasSizeId): void {
   const size = getCanvasSizeById(sizeId)
+  const workspace = getWorkspaceSize(size)
   const wrapper = canvas.wrapperEl
   const container = wrapper?.parentElement
   if (!container) {
     return
   }
-  fitCanvasToContainer(canvas, container, size.width)
+  fitCanvasToContainer(canvas, container, workspace.width, workspace.height)
 }
 
 /**

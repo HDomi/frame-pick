@@ -6,32 +6,53 @@ import { useAlertDialog } from '@/contexts/AlertDialogContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanvasImage } from '@/hooks/useCanvasImage'
 import { removeBackground } from '@/lib/background-removal'
-import { CUTOUT_MAX_EDGE } from '@/lib/cutout-constants'
+import { CUTOUT_MAX_EDGE, type CutoutQuality } from '@/lib/cutout-constants'
 import {
   detectDeviceCapability,
   downscaleImageFile,
   getCutoutInputWarnings,
   readImageLongestEdge,
 } from '@/lib/device-capability'
+import { cn } from '@/lib/cn'
 
-interface CutoutDialogProps {
+interface ImageStickerDialogProps {
   isOpen: boolean
   onClose: () => void
 }
 
+const QUALITY_OPTIONS: { value: CutoutQuality; label: string; hint: string }[] = [
+  {
+    value: 'solid',
+    label: '단색 배경',
+    hint: '로고·플랫 이미지 추천',
+  },
+  {
+    value: 'quality',
+    label: 'AI 고품질',
+    hint: '실사·복잡한 배경',
+  },
+  {
+    value: 'fast',
+    label: 'AI 빠름',
+    hint: '경량·저사양',
+  },
+]
+
 /**
- * 누끼 후 업로드 다이얼로그
- * @param {CutoutDialogProps} props - props
+ * 이미지로 스티커 만들기 다이얼로그 (누끼는 선택)
+ * @param {ImageStickerDialogProps} props - props
  * @returns {React.ReactElement}
  */
-export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
-  const { addUploadedImageFromBlob } = useCanvasImage()
+export function CutoutDialog({ isOpen, onClose }: ImageStickerDialogProps) {
+  const { addImageStickerFromBlob } = useCanvasImage()
   const { confirm } = useAlertDialog()
   const { toast } = useToast()
   const [sourceFile, setSourceFile] = useState<File | null>(null)
   const [sourcePreviewUrl, setSourcePreviewUrl] = useState<string | null>(null)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [resultBlob, setResultBlob] = useState<Blob | null>(null)
+  const [useCutout, setUseCutout] = useState(false)
+  const [cutoutQuality, setCutoutQuality] = useState<CutoutQuality>('solid')
   const [isRunning, setIsRunning] = useState(false)
   const [progressLabel, setProgressLabel] = useState('')
   const [progressPct, setProgressPct] = useState(0)
@@ -43,6 +64,8 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
       abortRef.current = null
       setSourceFile(null)
       setResultBlob(null)
+      setUseCutout(false)
+      setCutoutQuality('solid')
       setIsRunning(false)
       setProgressLabel('')
       setProgressPct(0)
@@ -86,11 +109,11 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
 
   /**
    * 누끼 실행
-   * @returns {Promise<void>}
+   * @returns {Promise<Blob | null>}
    */
-  const handleRunCutout = async () => {
-    if (!sourceFile || isRunning) {
-      return
+  const runCutout = async (): Promise<Blob | null> => {
+    if (!sourceFile) {
+      return null
     }
 
     let longestEdge = 0
@@ -98,24 +121,25 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
       longestEdge = await readImageLongestEdge(sourceFile)
     } catch {
       toast({ message: '이미지를 읽을 수 없습니다.', variant: 'error' })
-      return
+      return null
     }
 
     const capability = detectDeviceCapability()
     const inputWarnings = getCutoutInputWarnings(sourceFile, longestEdge)
-    const shouldWarn = capability.isLowSpec || inputWarnings.length > 0
+    const needsHeavyWarn =
+      cutoutQuality !== 'solid' && (capability.isLowSpec || inputWarnings.length > 0)
 
-    if (shouldWarn) {
+    if (needsHeavyWarn) {
       const reasons = [...capability.reasons, ...inputWarnings].join(', ')
       const ok = await confirm({
-        title: '누끼를 진행할까요?',
-        message: `이 환경에서는 처리가 오래 걸리거나 탭이 불안정할 수 있습니다.\n(${reasons})\n\n첫 실행 시 모델을 받으며, 긴 변은 ${CUTOUT_MAX_EDGE}px로 줄여 처리합니다.`,
+        title: 'AI 누끼를 진행할까요?',
+        message: `이 환경에서는 처리가 오래 걸리거나 탭이 불안정할 수 있습니다.\n(${reasons})\n\n로고/단색이면 「단색 배경」이 더 깔끔합니다. 긴 변은 ${CUTOUT_MAX_EDGE}px로 줄여 처리합니다.`,
         confirmLabel: '계속',
         cancelLabel: '취소',
         variant: 'info',
       })
       if (!ok) {
-        return
+        return null
       }
     }
 
@@ -128,7 +152,7 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
     try {
       const inputBlob = await downscaleImageFile(sourceFile, CUTOUT_MAX_EDGE)
       const blob = await removeBackground(inputBlob, {
-        preferLightModel: true,
+        quality: cutoutQuality,
         signal: controller.signal,
         onProgress: (info) => {
           setProgressPct(Math.round(info.progress))
@@ -144,7 +168,7 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
       setResultUrl(url)
       setProgressPct(100)
       setProgressLabel('완료')
-      toast({ message: '누끼가 완료되었습니다. 캔버스에 추가하세요.', variant: 'success' })
+      return blob
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         toast({ message: '누끼를 취소했습니다.', variant: 'info' })
@@ -152,10 +176,11 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
         const message =
           error instanceof Error ? error.message : '누끼에 실패했습니다.'
         toast({
-          message: `${message} 해상도를 낮추거나 PC에서 다시 시도해 주세요.`,
+          message: `${message} 「단색 배경」모드를 시도해 보세요.`,
           variant: 'error',
         })
       }
+      return null
     } finally {
       setIsRunning(false)
       abortRef.current = null
@@ -163,20 +188,38 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
   }
 
   /**
-   * 결과를 캔버스에 추가
+   * 캔버스에 스티커로 추가
    * @returns {Promise<void>}
    */
   const handleAddToCanvas = async () => {
-    if (!resultBlob) {
+    if (!sourceFile || isRunning) {
       return
     }
+
     try {
-      const ok = await addUploadedImageFromBlob(resultBlob, '누끼이미지.png')
+      let blob: Blob = sourceFile
+      if (useCutout) {
+        if (resultBlob) {
+          blob = resultBlob
+        } else {
+          const cut = await runCutout()
+          if (!cut) {
+            return
+          }
+          blob = cut
+        }
+      }
+
+      const name = sourceFile.name.replace(/\.[^.]+$/, '') || '이미지 스티커'
+      const ok = await addImageStickerFromBlob(blob, name)
       if (!ok) {
         toast({ message: '캔버스가 준비되지 않았습니다.', variant: 'error' })
         return
       }
-      toast({ message: '누끼 이미지를 추가했습니다.', variant: 'success' })
+      toast({
+        message: '스티커를 추가했습니다. 바깥 핸들로 크기·회전하세요.',
+        variant: 'success',
+      })
       onClose()
     } catch {
       toast({ message: '캔버스 추가에 실패했습니다.', variant: 'error' })
@@ -194,7 +237,7 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
   return (
     <Modal
       isOpen={isOpen}
-      title="누끼 후 업로드"
+      title="이미지로 스티커 만들기"
       showCloseButton={!isRunning}
       closeOnOverlayClick={!isRunning}
       onClose={onClose}
@@ -202,7 +245,7 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-[var(--color-text-muted)]">
-            새 파일을 올려 배경을 제거한 뒤 업로드된이미지 레이어로 추가합니다.
+            로고·단색(안쪽 구멍 포함)은 「단색 배경」, 인물·복잡한 배경은 「AI 고품질」.
           </p>
           <div className="flex gap-2">
             {isRunning ? (
@@ -210,18 +253,20 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
                 취소
               </Button>
             ) : null}
-            <Button
-              variant="secondary"
-              disabled={!sourceFile || isRunning}
-              onClick={() => {
-                void handleRunCutout()
-              }}
-            >
-              누끼 실행
-            </Button>
+            {useCutout ? (
+              <Button
+                variant="secondary"
+                disabled={!sourceFile || isRunning}
+                onClick={() => {
+                  void runCutout()
+                }}
+              >
+                누끼 미리보기
+              </Button>
+            ) : null}
             <Button
               variant="primary"
-              disabled={!resultBlob || isRunning}
+              disabled={!sourceFile || isRunning}
               onClick={() => {
                 void handleAddToCanvas()
               }}
@@ -234,8 +279,8 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
     >
       <div className="flex flex-col gap-3">
         <FileDropzone
-          title="누끼할 이미지 선택"
-          description="PNG / JPEG / WebP"
+          title="스티커로 만들 이미지 선택"
+          description="PNG / JPEG / WebP · 원본 크기 기준"
           accept="image/png,image/jpeg,image/webp"
           disabled={isRunning}
           onChange={(event) => {
@@ -244,6 +289,56 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
           }}
         />
 
+        <label className="flex items-center gap-2 text-sm text-[var(--color-text)]">
+          <input
+            type="checkbox"
+            checked={useCutout}
+            disabled={isRunning}
+            onChange={(event) => {
+              setUseCutout(event.target.checked)
+            }}
+          />
+          배경 제거(누끼) 후 추가
+        </label>
+
+        {useCutout ? (
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs text-[var(--color-text-muted)]">누끼 방식</p>
+            <div className="grid grid-cols-3 gap-1">
+              {QUALITY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={isRunning}
+                  className={cn(
+                    'rounded-md border px-2 py-2 text-left transition-colors',
+                    cutoutQuality === option.value
+                      ? 'border-[var(--color-accent)] bg-[var(--color-surface-raised)]'
+                      : 'border-[var(--color-border)]',
+                  )}
+                  onClick={() => {
+                    setCutoutQuality(option.value)
+                    setResultBlob(null)
+                    if (resultUrl) {
+                      URL.revokeObjectURL(resultUrl)
+                      setResultUrl(null)
+                    }
+                    setProgressLabel('')
+                    setProgressPct(0)
+                  }}
+                >
+                  <span className="block text-xs font-medium text-[var(--color-text)]">
+                    {option.label}
+                  </span>
+                  <span className="block text-[10px] text-[var(--color-text-muted)]">
+                    {option.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         {isRunning || progressLabel ? (
           <div className="space-y-1">
             <ProgressBar value={progressPct} />
@@ -251,7 +346,13 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div
+          className={
+            useCutout
+              ? 'grid grid-cols-1 gap-3 sm:grid-cols-2'
+              : 'grid grid-cols-1 gap-3'
+          }
+        >
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-2">
             <p className="mb-1 text-xs text-[var(--color-text-muted)]">원본</p>
             {sourcePreviewUrl ? (
@@ -267,21 +368,23 @@ export function CutoutDialog({ isOpen, onClose }: CutoutDialogProps) {
               </p>
             )}
           </div>
-          <div className="rounded-md border border-[var(--color-border)] bg-[repeating-conic-gradient(#808080_0%_25%,#c0c0c0_0%_50%)] bg-[length:16px_16px] p-2">
-            <p className="mb-1 text-xs text-[var(--color-text)] drop-shadow">결과</p>
-            {resultUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={resultUrl}
-                alt="누끼 결과"
-                className="mx-auto max-h-48 object-contain"
-              />
-            ) : (
-              <p className="py-10 text-center text-xs text-[var(--color-text-muted)]">
-                누끼 실행 후 표시
-              </p>
-            )}
-          </div>
+          {useCutout ? (
+            <div className="rounded-md border border-[var(--color-border)] bg-[repeating-conic-gradient(#808080_0%_25%,#c0c0c0_0%_50%)] bg-[length:16px_16px] p-2">
+              <p className="mb-1 text-xs text-[var(--color-text)] drop-shadow">누끼 결과</p>
+              {resultUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={resultUrl}
+                  alt="누끼 결과"
+                  className="mx-auto max-h-48 object-contain"
+                />
+              ) : (
+                <p className="py-10 text-center text-xs text-[var(--color-text-muted)]">
+                  미리보기 또는 추가 시 실행
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </Modal>

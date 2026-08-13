@@ -34,6 +34,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Fetch quality cutout model
+        run: |
+          mkdir -p public/models
+          if [ ! -f public/models/silueta.onnx ]; then
+            curl -fsSL -o public/models/silueta.onnx \
+              https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx
+          fi
+          ls -lh public/models/
+
       - name: Build static export
         run: pnpm build
 

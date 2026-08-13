@@ -1,12 +1,26 @@
 import type { Canvas } from 'fabric'
+import { getArtboardPadding } from '@/lib/artboard'
 import type { CanvasSize } from '@/lib/canvas-size'
+import {
+  getExportExtension,
+  getExportMultiplier,
+  getExportQualityValue,
+  isLossyExportFormat,
+  resolveExportPixelSize,
+  type ExportFormat,
+  type ExportOptions,
+} from '@/lib/export-options'
 
 /**
  * 다운로드용 타임스탬프 파일명을 만든다.
- * @param {CanvasSize} size - 현재 해상도
- * @returns {string} - frame-pick-WxH-YYYYMMDD-HHmmss.png
+ * @param {Pick<CanvasSize, 'width' | 'height'>} size - 출력 해상도
+ * @param {ExportFormat} [format='png']
+ * @returns {string}
  */
-export function createThumbnailFileName(size: CanvasSize): string {
+export function createThumbnailFileName(
+  size: Pick<CanvasSize, 'width' | 'height'>,
+  format: ExportFormat = 'png',
+): string {
   const now = new Date()
   const pad = (value: number) => String(value).padStart(2, '0')
   const stamp = [
@@ -18,85 +32,126 @@ export function createThumbnailFileName(size: CanvasSize): string {
     pad(now.getMinutes()),
     pad(now.getSeconds()),
   ].join('')
-
-  return `frame-pick-${size.width}x${size.height}-${stamp}.png`
+  const ext = getExportExtension(format)
+  return `frame-pick-${size.width}x${size.height}-${stamp}.${ext}`
 }
 
 /**
- * Fabric 캔버스를 논리 해상도 data URL로 렌더한다.
- * @param {Canvas | null} canvas - Fabric 캔버스
- * @param {CanvasSize} size - 논리 해상도
- * @returns {string | null} - PNG data URL
+ * Fabric 캔버스에서 아트보드 영역만 data URL로 렌더한다.
+ * @param {Canvas | null} canvas
+ * @param {CanvasSize} size - 아트보드 논리 크기
+ * @param {Partial<ExportOptions>} [options]
+ * @returns {string | null}
  */
-export function getCanvasDataUrl(canvas: Canvas | null, size: CanvasSize): string | null {
+export function getCanvasDataUrl(
+  canvas: Canvas | null,
+  size: CanvasSize,
+  options: Partial<ExportOptions> = {},
+): string | null {
   if (!canvas) {
     return null
   }
 
-  // 표시는 CSS 스케일만 쓰므로 zoom=1·논리 해상도 기준으로 그대로보내면 된다.
-  // 혹시 줌이 남아 있어도 캡처 전에 논리 해상도로 맞춘다.
+  const format: ExportFormat = options.format ?? 'png'
+  const quality = getExportQualityValue(options.quality ?? 'high')
+  const multiplier = options.resolutionId
+    ? getExportMultiplier(size, options.resolutionId)
+    : 1
+
   const prevZoom = canvas.getZoom()
-  const prevWidth = canvas.getWidth()
-  const prevHeight = canvas.getHeight()
   const prevVpt = canvas.viewportTransform
     ? ([...canvas.viewportTransform] as [number, number, number, number, number, number])
     : ([1, 0, 0, 1, 0, 0] as [number, number, number, number, number, number])
-  const prevCssWidth = canvas.lowerCanvasEl?.style.width
-  const prevCssHeight = canvas.lowerCanvasEl?.style.height
 
   try {
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
     canvas.setZoom(1)
-    canvas.setDimensions({
-      width: size.width,
-      height: size.height,
-    })
 
-    return canvas.toDataURL({
-      format: 'png',
-      multiplier: 1,
-      enableRetinaScaling: false,
-    })
+    const padding = getArtboardPadding(size.width)
+    const workspaceMatches =
+      Math.abs(canvas.getWidth() - (size.width + padding * 2)) < 2 &&
+      Math.abs(canvas.getHeight() - (size.height + padding * 2)) < 2
+
+    const encodeOptions = {
+      format,
+      quality: isLossyExportFormat(format) ? quality : 1,
+      multiplier,
+      enableRetinaScaling: false as const,
+    }
+
+    if (workspaceMatches) {
+      return canvas.toDataURL({
+        ...encodeOptions,
+        left: padding,
+        top: padding,
+        width: size.width,
+        height: size.height,
+      })
+    }
+
+    return canvas.toDataURL(encodeOptions)
   } finally {
     canvas.setViewportTransform(prevVpt)
     canvas.setZoom(prevZoom)
-    canvas.setDimensions({
-      width: prevWidth,
-      height: prevHeight,
-    })
-    if (prevCssWidth && prevCssHeight) {
-      canvas.setDimensions(
-        {
-          width: prevCssWidth,
-          height: prevCssHeight,
-        },
-        { cssOnly: true },
-      )
-    }
     canvas.requestRenderAll()
   }
 }
 
 /**
- * Fabric 캔버스를 현재 논리 해상도 PNG로 다운로드한다.
- * @param {Canvas | null} canvas - Fabric 캔버스
- * @param {CanvasSize} size - 논리 해상도
- * @param {string} [fileName] - 저장 파일명
- * @returns {boolean} - 다운로드 시작 성공 여부
+ * data URL을 파일로 저장한다.
+ * @param {string} dataUrl
+ * @param {string} fileName
+ * @returns {void}
  */
-export function exportCanvasAsPng(
-  canvas: Canvas | null,
-  size: CanvasSize,
-  fileName = createThumbnailFileName(size),
-): boolean {
-  const dataUrl = getCanvasDataUrl(canvas, size)
-  if (!dataUrl) {
-    return false
-  }
-
+function triggerDownload(dataUrl: string, fileName: string): void {
   const anchor = document.createElement('a')
   anchor.href = dataUrl
   anchor.download = fileName
   anchor.click()
+}
+
+/**
+ * 옵션에 따라 아트보드를 내보낸다.
+ * @param {Canvas | null} canvas
+ * @param {CanvasSize} artboard
+ * @param {ExportOptions} options
+ * @param {string} [fileName]
+ * @returns {boolean}
+ */
+export function exportCanvas(
+  canvas: Canvas | null,
+  artboard: CanvasSize,
+  options: ExportOptions,
+  fileName?: string,
+): boolean {
+  const dataUrl = getCanvasDataUrl(canvas, artboard, options)
+  if (!dataUrl) {
+    return false
+  }
+
+  const outputSize = resolveExportPixelSize(artboard, options.resolutionId)
+  const name = fileName ?? createThumbnailFileName(outputSize, options.format)
+  triggerDownload(dataUrl, name)
   return true
+}
+
+/**
+ * Fabric 캔버스를 현재 논리 해상도 PNG로 다운로드한다.
+ * @param {Canvas | null} canvas
+ * @param {CanvasSize} size
+ * @param {string} [fileName]
+ * @returns {boolean}
+ * @deprecated exportCanvas 사용
+ */
+export function exportCanvasAsPng(
+  canvas: Canvas | null,
+  size: CanvasSize,
+  fileName?: string,
+): boolean {
+  return exportCanvas(
+    canvas,
+    size,
+    { format: 'png', quality: 'high', resolutionId: 'artboard' },
+    fileName,
+  )
 }

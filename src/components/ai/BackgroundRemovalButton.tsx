@@ -8,7 +8,7 @@ import { useVideoSession } from '@/contexts/VideoSessionContext'
 import { useCanvas } from '@/hooks/useCanvas'
 
 /**
- * 「누끼 후 업로드」 진입 버튼
+ * 「이미지로 스티커 만들기」 진입 버튼
  * @returns {React.ReactElement}
  */
 export function BackgroundRemovalButton() {
@@ -27,7 +27,7 @@ export function BackgroundRemovalButton() {
         disabled={!isReady || locked}
         onClick={() => setOpen(true)}
       >
-        누끼 후 업로드
+        이미지로 스티커 만들기
       </Button>
       <CutoutDialog isOpen={open} onClose={() => setOpen(false)} />
     </>

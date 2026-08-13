@@ -35,3 +35,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# large cutout models (CI downloads silueta; keep u2netp committed)
+/public/models/silueta.onnx
+/public/models/u2net.onnx
+/public/models/isnet-general-use.onnx
+

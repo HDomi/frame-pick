@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { IText, Shadow, Textbox, type FabricObject } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
+import { getArtboardBounds, getArtboardCenter } from '@/lib/artboard'
 import { normalizeHexColor } from '@/lib/color-repository'
 import { EDITOR_FONT_FAMILY } from '@/lib/editor-font'
+import { parseFabricFill } from '@/lib/fill-value'
 import { createDefaultLayerName, createLayerId, ensureLayerMeta } from '@/lib/layers'
 import {
   DEFAULT_TEXT_FILL,
@@ -74,8 +76,9 @@ export function useTextStyle() {
 
     setHasTextTarget(true)
     const shadow = active.shadow as Shadow | null | undefined
+    const fillValue = parseFabricFill(active.fill, DEFAULT_TEXT_FILL)
     setStyle({
-      fill: normalizeHexColor(String(active.fill ?? DEFAULT_TEXT_FILL)) ?? DEFAULT_TEXT_FILL,
+      fill: fillValue.mode === 'solid' ? fillValue.color : fillValue.colorA,
       stroke:
         normalizeHexColor(String(active.stroke ?? DEFAULT_TEXT_STROKE)) ?? DEFAULT_TEXT_STROKE,
       strokeWidth: Number(active.strokeWidth ?? DEFAULT_TEXT_STROKE_WIDTH),
@@ -208,9 +211,11 @@ export function useTextStyle() {
         return true
       }
 
+      const bounds = getArtboardBounds(canvas, canvasSize)
+      const center = getArtboardCenter(bounds)
       const text = new IText(preset.name, {
-        left: canvasSize.width / 2,
-        top: canvasSize.height / 2,
+        left: center.left,
+        top: center.top,
         originX: 'center',
         originY: 'center',
         fill: preset.fill,
@@ -238,7 +243,7 @@ export function useTextStyle() {
       syncFromCanvas()
       return true
     },
-    [canvas, canvasSize.height, canvasSize.width, syncFromCanvas],
+    [canvas, canvasSize, syncFromCanvas],
   )
 
   return {

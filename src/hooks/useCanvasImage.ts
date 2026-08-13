@@ -5,6 +5,7 @@ import { FabricImage } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
 import { DEFAULT_IMAGE_FIT } from '@/lib/constants'
 import { readFileAsDataUrl } from '@/lib/file-data-url'
+import { addImageStickerLayer } from '@/lib/image-sticker'
 import {
   addUploadedImageLayer,
   applyImageFitMode,
@@ -15,11 +16,11 @@ import {
 import { createLayerId, ensureLayerMeta, type LayerAwareObject } from '@/lib/layers'
 
 /**
- * 영상이미지·업로드된이미지 레이어를 캔버스에 올리는 훅
+ * 영상이미지·업로드된이미지·이미지 스티커를 캔버스에 올리는 훅
  * @returns 이미지 레이어 API
  */
 export function useCanvasImage() {
-  const { canvas, isReady } = useCanvas()
+  const { canvas, canvasSize, isReady } = useCanvas()
   const [selectedImageFit, setSelectedImageFit] = useState<ImageFitMode | null>(null)
   const [hasImageTarget, setHasImageTarget] = useState(false)
 
@@ -102,25 +103,24 @@ export function useCanvasImage() {
   )
 
   /**
-   * Blob(누끼 결과 등)을 「업로드된이미지」 레이어로 추가한다.
+   * Blob을 「이미지 스티커」로 원본 비율 배치하고 선택한다.
    * @param {Blob} blob - 이미지 Blob
-   * @param {string} [fileName] - 파일명 힌트
-   * @param {ImageFitMode} [fit] - fit 모드
+   * @param {string} [name] - 레이어 이름
    * @returns {Promise<boolean>}
    */
-  const addUploadedImageFromBlob = useCallback(
-    async (
-      blob: Blob,
-      fileName = 'cutout.png',
-      fit: ImageFitMode = DEFAULT_IMAGE_FIT,
-    ): Promise<boolean> => {
+  const addImageStickerFromBlob = useCallback(
+    async (blob: Blob, name = '이미지 스티커'): Promise<boolean> => {
       if (!canvas) {
         return false
       }
-      const file = new File([blob], fileName, { type: blob.type || 'image/png' })
-      return addUploadedImage(file, fit)
+      const dataUrl = await readFileAsDataUrl(
+        new File([blob], `${name}.png`, { type: blob.type || 'image/png' }),
+      )
+      const image = await FabricImage.fromURL(dataUrl)
+      addImageStickerLayer(canvas, image, canvasSize, name)
+      return true
     },
-    [addUploadedImage, canvas],
+    [canvas, canvasSize],
   )
 
   /**
@@ -151,7 +151,7 @@ export function useCanvasImage() {
     selectedImageFit,
     applyVideoFrame,
     addUploadedImage,
-    addUploadedImageFromBlob,
+    addImageStickerFromBlob,
     setActiveImageFit,
   }
 }

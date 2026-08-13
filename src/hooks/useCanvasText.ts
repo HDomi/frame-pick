@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { IText } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
+import { getArtboardBounds, getArtboardCenter } from '@/lib/artboard'
 import {
   DEFAULT_TEXT_FILL,
   DEFAULT_TEXT_FONT_SIZE,
@@ -21,7 +22,7 @@ export function useCanvasText() {
   const { canvas, canvasSize } = useCanvas()
 
   /**
-   * 기본 스타일 텍스트 객체를 캔버스 중앙에 추가한다.
+   * 기본 스타일 텍스트 객체를 아트보드 중앙에 추가한다.
    * @returns {Promise<void>}
    */
   const addText = useCallback(async () => {
@@ -32,10 +33,12 @@ export function useCanvasText() {
     const fontLoaded = await ensureEditorFontLoaded()
     const fontFamily = fontLoaded ? EDITOR_FONT_FAMILY : 'sans-serif'
     const fontSizeScale = canvasSize.width / 1920
+    const bounds = getArtboardBounds(canvas, canvasSize)
+    const center = getArtboardCenter(bounds)
 
     const text = new IText('텍스트를 입력하세요', {
-      left: canvasSize.width / 2,
-      top: canvasSize.height / 2,
+      left: center.left,
+      top: center.top,
       originX: 'center',
       originY: 'center',
       fill: DEFAULT_TEXT_FILL,
@@ -55,7 +58,7 @@ export function useCanvasText() {
     canvas.add(text)
     canvas.setActiveObject(text)
     canvas.requestRenderAll()
-  }, [canvas, canvasSize.height, canvasSize.width])
+  }, [canvas, canvasSize])
 
   return { addText }
 }

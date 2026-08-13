@@ -108,7 +108,7 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
         }
         // 동일 해상도에서 setDimensions를 다시 호출하면 cssOnly 스케일이 깨져
         // 중앙 객체가 overflow로 잘려 안 보이는 버그가 난다. JSON만 복원한다.
-        await applyCanvasJson(canvas, canvasJson)
+        await applyCanvasJson(canvas, canvasJson, sizeId)
         refitCanvasDisplay(canvas, sizeId)
       } finally {
         // loadFromJSON 이벤트 플러시 이후 히스토리 기록 재개
@@ -274,7 +274,7 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
           if (draft.sizeId !== canvasSizeIdRef.current) {
             setCanvasSizeId(draft.sizeId, { skipObjectScale: true })
           }
-          await applyCanvasJson(canvas, draft.canvasJson)
+          await applyCanvasJson(canvas, draft.canvasJson, draft.sizeId)
           refitCanvasDisplay(canvas, draft.sizeId)
           setLastSavedAt(draft.updatedAt)
           toast({ message: '임시저장본을 불러왔습니다.', variant: 'info' })

@@ -1,17 +1,23 @@
 'use client'
 
+import { useState } from 'react'
 import RedoIcon from '@mui/icons-material/Redo'
 import UndoIcon from '@mui/icons-material/Undo'
+import { ExportDialog } from '@/components/export/ExportDialog'
 import { PreviewModal } from '@/components/preview/PreviewModal'
 import { HeaderMenu } from '@/components/layout/HeaderMenu'
-import { Button, HelpTip, IconButton, SegmentedControl } from '@/components/ui'
+import { Button, HelpTip, IconButton } from '@/components/ui'
 import { useEditorSession } from '@/contexts/EditorSessionContext'
 import { useLoading } from '@/contexts/LoadingContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useCanvasDownload } from '@/hooks/useCanvasDownload'
 import { useCanvasPreview } from '@/hooks/useCanvasPreview'
-import { CANVAS_SIZE_PRESETS, type CanvasSizeId } from '@/lib/canvas-size'
+import {
+  getExportExtension,
+  resolveExportPixelSize,
+  type ExportOptions,
+} from '@/lib/export-options'
 
 /**
  * 저장 시각을 짧게 표시한다.
@@ -34,11 +40,13 @@ function formatSavedAt(timestamp: number | null): string {
  * @returns {React.ReactElement} - 앱 헤더
  */
 export function AppHeader() {
-  const { isReady, canvasSizeId, canvasSize, setCanvasSizeId } = useCanvas()
-  const { downloadPng } = useCanvasDownload()
+  const { isReady, canvasSize } = useCanvas()
+  const { exportWithOptions } = useCanvasDownload()
   const { isOpen, previewUrl, openPreview, closePreview } = useCanvasPreview()
   const { withLoading } = useLoading()
   const { toast } = useToast()
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const {
     isHydrated,
     isSaving,
@@ -54,19 +62,40 @@ export function AppHeader() {
   const controlsEnabled = isReady && isHydrated
 
   /**
-   * PNG 다운로드 클릭
+   * 다운로드 설정 다이얼로그 열기
+   * @returns {void}
+   */
+  const handleDownloadClick = () => {
+    setIsExportOpen(true)
+  }
+
+  /**
+   * 설정대로 내보내기
+   * @param {ExportOptions} options
    * @returns {Promise<void>}
    */
-  const handleDownloadClick = async () => {
+  const handleExport = async (options: ExportOptions) => {
+    setIsExporting(true)
     try {
-      const ok = await withLoading(async () => downloadPng(), 'PNG 내보내는 중…')
+      const ok = await withLoading(
+        async () => exportWithOptions(options),
+        '내보내는 중…',
+      )
       if (ok) {
-        toast({ message: 'PNG를 다운로드했습니다.', variant: 'success' })
+        const size = resolveExportPixelSize(canvasSize, options.resolutionId)
+        const ext = getExportExtension(options.format).toUpperCase()
+        toast({
+          message: `${ext} ${size.width}×${size.height} 다운로드했습니다.`,
+          variant: 'success',
+        })
+        setIsExportOpen(false)
       } else {
         toast({ message: '다운로드에 실패했습니다.', variant: 'error' })
       }
     } catch {
       toast({ message: '다운로드에 실패했습니다.', variant: 'error' })
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -89,17 +118,6 @@ export function AppHeader() {
    */
   const handleReset = async () => {
     await resetEditor()
-  }
-
-  /**
-   * 해상도 프리셋 변경
-   * @param {CanvasSizeId} nextId - 선택한 프리셋
-   * @returns {void}
-   */
-  const handleSizeChange = (nextId: CanvasSizeId) => {
-    setCanvasSizeId(nextId)
-    const label = CANVAS_SIZE_PRESETS.find((preset) => preset.id === nextId)?.label ?? nextId
-    toast({ message: `해상도를 ${label}로 변경했습니다.` })
   }
 
   return (
@@ -145,19 +163,6 @@ export function AppHeader() {
             <RedoIcon fontSize="small" />
           </IconButton>
 
-          <SegmentedControl
-            value={canvasSizeId}
-            onChange={handleSizeChange}
-            options={CANVAS_SIZE_PRESETS.map((preset) => ({
-              value: preset.id,
-              label: preset.label,
-              title: preset.description,
-            }))}
-          />
-          <span className="hidden text-xs text-[var(--color-text-muted)] xl:inline">
-            {canvasSize.description}
-          </span>
-
           <Button
             variant="secondary"
             disabled={!controlsEnabled || isSaving}
@@ -182,11 +187,9 @@ export function AppHeader() {
           <Button
             variant="primary"
             disabled={!controlsEnabled}
-            onClick={() => {
-              void handleDownloadClick()
-            }}
+            onClick={handleDownloadClick}
           >
-            PNG 다운로드
+            다운로드
           </Button>
         </div>
       </header>
@@ -196,6 +199,18 @@ export function AppHeader() {
         previewUrl={previewUrl}
         resolutionLabel={`${canvasSize.label} · ${canvasSize.description}`}
         onClose={closePreview}
+      />
+
+      <ExportDialog
+        isOpen={isExportOpen}
+        artboard={canvasSize}
+        isExporting={isExporting}
+        onClose={() => {
+          if (!isExporting) {
+            setIsExportOpen(false)
+          }
+        }}
+        onExport={handleExport}
       />
     </>
   )

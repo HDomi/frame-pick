@@ -1,43 +1,45 @@
 import type { Canvas } from 'fabric'
-import type { CanvasSize } from '@/lib/canvas-size'
+import { getWorkspaceSize } from '@/lib/artboard'
 import { ensureBackgroundLayer, isBackgroundObject } from '@/lib/background-layer'
-import { CANVAS_ASPECT_RATIO } from '@/lib/constants'
+import type { CanvasSize } from '@/lib/canvas-size'
+import { WORKSPACE_BG, ensureWorkspaceLayout } from '@/lib/image-sticker'
 
 /**
- * 컨테이너 너비에 맞춰 캔버스를 CSS로만 스케일한다.
- * 논리 해상도가 이미 맞으면 setDimensions(buffer)를 다시 호출하지 않는다.
- * (패널 리사이즈 틱마다 buffer reset → 깜빡임/이미지 유실 방지)
+ * 컨테이너 너비에 맞춰 워크스페이스 캔버스를 CSS로만 스케일한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {HTMLElement} container - 뷰포트 컨테이너
- * @param {number} logicalWidth - 논리 가로 해상도
+ * @param {number} workspaceWidth - 워크스페이스 가로
+ * @param {number} workspaceHeight - 워크스페이스 세로
  * @returns {void}
  */
 export function fitCanvasToContainer(
   canvas: Canvas,
   container: HTMLElement,
-  logicalWidth: number,
+  workspaceWidth: number,
+  workspaceHeight: number,
 ): void {
   const containerWidth = container.clientWidth
-  if (containerWidth <= 0 || logicalWidth <= 0) {
+  if (containerWidth <= 0 || workspaceWidth <= 0 || workspaceHeight <= 0) {
     return
   }
 
-  const logicalHeight = logicalWidth / CANVAS_ASPECT_RATIO
-  const displayHeight = containerWidth / CANVAS_ASPECT_RATIO
+  const aspect = workspaceWidth / workspaceHeight
+  const displayHeight = containerWidth / aspect
   const cssWidth = `${containerWidth}px`
   const cssHeight = `${displayHeight}px`
 
   const needsLogicalReset =
-    Math.abs(canvas.getWidth() - logicalWidth) > 0.5 ||
-    Math.abs(canvas.getHeight() - logicalHeight) > 0.5
+    Math.abs(canvas.getWidth() - workspaceWidth) > 0.5 ||
+    Math.abs(canvas.getHeight() - workspaceHeight) > 0.5
 
   if (needsLogicalReset) {
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
     canvas.setZoom(1)
     canvas.setDimensions({
-      width: logicalWidth,
-      height: logicalHeight,
+      width: workspaceWidth,
+      height: workspaceHeight,
     })
+    canvas.backgroundColor = WORKSPACE_BG
   }
 
   const lower = canvas.lowerCanvasEl
@@ -64,10 +66,10 @@ export function fitCanvasToContainer(
 }
 
 /**
- * 논리 해상도를 바꾸고 기존 객체를 비율에 맞게 스케일한다.
+ * 아트보드 해상도를 바꾸고 워크스페이스·객체를 비율에 맞게 스케일한다.
  * @param {Canvas} canvas - Fabric 캔버스
- * @param {CanvasSize} nextSize - 새 해상도
- * @param {CanvasSize} prevSize - 이전 해상도
+ * @param {CanvasSize} nextSize - 새 아트보드
+ * @param {CanvasSize} prevSize - 이전 아트보드
  * @returns {void}
  */
 export function applyCanvasSize(
@@ -75,8 +77,10 @@ export function applyCanvasSize(
   nextSize: CanvasSize,
   prevSize: CanvasSize,
 ): void {
-  const scaleX = nextSize.width / prevSize.width
-  const scaleY = nextSize.height / prevSize.height
+  const prevWorkspace = getWorkspaceSize(prevSize)
+  const nextWorkspace = getWorkspaceSize(nextSize)
+  const scaleX = nextWorkspace.width / prevWorkspace.width
+  const scaleY = nextWorkspace.height / prevWorkspace.height
 
   canvas.getObjects().forEach((object) => {
     if (isBackgroundObject(object)) {
@@ -98,12 +102,7 @@ export function applyCanvasSize(
     background.setCoords()
   }
 
-  canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
-  canvas.setZoom(1)
-  canvas.setDimensions({
-    width: nextSize.width,
-    height: nextSize.height,
-  })
+  ensureWorkspaceLayout(canvas, nextSize)
   ensureBackgroundLayer(canvas)
   canvas.calcOffset()
   canvas.requestRenderAll()

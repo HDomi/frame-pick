@@ -1,5 +1,7 @@
 import type { Canvas, FabricImage } from 'fabric'
+import { getArtboardBounds } from '@/lib/artboard'
 import { ensureBackgroundLayer } from '@/lib/background-layer'
+import type { CanvasSize } from '@/lib/canvas-size'
 import { DEFAULT_IMAGE_FIT } from '@/lib/constants'
 import type { LayerAwareObject } from '@/lib/layers'
 
@@ -40,25 +42,27 @@ export function isVideoImageObject(
 }
 
 /**
- * 이미지 fit 모드를 적용한다.
+ * 이미지 fit 모드를 아트보드 기준으로 적용한다.
  * @param {FabricImage} image - Fabric 이미지
- * @param {number} canvasWidth - 논리 너비
- * @param {number} canvasHeight - 논리 높이
+ * @param {number} artboardWidth - 아트보드 가로
+ * @param {number} artboardHeight - 아트보드 세로
  * @param {ImageFitMode} mode - fit 모드
+ * @param {{ left: number; top: number }} [origin] - 아트보드 원점
  * @returns {void}
  */
 export function fitImageToCanvas(
   image: FabricImage,
-  canvasWidth: number,
-  canvasHeight: number,
+  artboardWidth: number,
+  artboardHeight: number,
   mode: ImageFitMode = DEFAULT_IMAGE_FIT,
+  origin: { left: number; top: number } = { left: 0, top: 0 },
 ): void {
   const element = image.getElement() as HTMLImageElement | HTMLCanvasElement
   const naturalWidth = element.width || 1
   const naturalHeight = element.height || 1
 
-  let scaleX = canvasWidth / naturalWidth
-  let scaleY = canvasHeight / naturalHeight
+  let scaleX = artboardWidth / naturalWidth
+  let scaleY = artboardHeight / naturalHeight
 
   if (mode === 'cover') {
     const scale = Math.max(scaleX, scaleY)
@@ -69,13 +73,12 @@ export function fitImageToCanvas(
     scaleX = scale
     scaleY = scale
   }
-  // stretch: scaleX/scaleY 그대로
 
   image.set({
     originX: 'center',
     originY: 'center',
-    left: canvasWidth / 2,
-    top: canvasHeight / 2,
+    left: origin.left + artboardWidth / 2,
+    top: origin.top + artboardHeight / 2,
     scaleX,
     scaleY,
   })
@@ -122,6 +125,36 @@ export function applyImageLayerMeta(
 }
 
 /**
+ * 캔버스에서 아트보드 영역을 구한다.
+ * @param {Canvas} canvas - 캔버스
+ * @returns {{ left: number; top: number; width: number; height: number }}
+ */
+function resolveArtboard(canvas: Canvas): {
+  left: number
+  top: number
+  width: number
+  height: number
+} {
+  const background = canvas.getObjects().find((object) => {
+    return (object as LayerAwareObject).layerType === 'background'
+  })
+  if (background && (background.width ?? 0) > 100) {
+    return {
+      left: background.left ?? 0,
+      top: background.top ?? 0,
+      width: background.width ?? canvas.getWidth(),
+      height: background.height ?? canvas.getHeight(),
+    }
+  }
+
+  const hint: Pick<CanvasSize, 'width' | 'height'> = {
+    width: 1920,
+    height: 1080,
+  }
+  return getArtboardBounds(canvas, hint)
+}
+
+/**
  * 영상이미지 레이어를 찾아 교체하거나 없으면 배경 바로 위에 추가한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {FabricImage} nextImage - 새 이미지
@@ -134,7 +167,11 @@ export function upsertVideoImageLayer(
   fit: ImageFitMode = DEFAULT_IMAGE_FIT,
 ): ImageLayerObject {
   ensureBackgroundLayer(canvas)
-  fitImageToCanvas(nextImage, canvas.getWidth(), canvas.getHeight(), fit)
+  const artboard = resolveArtboard(canvas)
+  fitImageToCanvas(nextImage, artboard.width, artboard.height, fit, {
+    left: artboard.left,
+    top: artboard.top,
+  })
   const layer = applyImageLayerMeta(nextImage, {
     layerId: VIDEO_IMAGE_LAYER_ID,
     layerName: VIDEO_IMAGE_LAYER_NAME,
@@ -182,7 +219,11 @@ export function addUploadedImageLayer(
   fit: ImageFitMode = DEFAULT_IMAGE_FIT,
 ): ImageLayerObject {
   ensureBackgroundLayer(canvas)
-  fitImageToCanvas(image, canvas.getWidth(), canvas.getHeight(), fit)
+  const artboard = resolveArtboard(canvas)
+  fitImageToCanvas(image, artboard.width, artboard.height, fit, {
+    left: artboard.left,
+    top: artboard.top,
+  })
   const layer = applyImageLayerMeta(image, {
     layerId,
     layerName: UPLOADED_IMAGE_LAYER_NAME,
@@ -207,7 +248,14 @@ export function applyImageFitMode(
   object: ImageLayerObject,
   fit: ImageFitMode,
 ): void {
-  fitImageToCanvas(object as unknown as FabricImage, canvas.getWidth(), canvas.getHeight(), fit)
+  const artboard = resolveArtboard(canvas)
+  fitImageToCanvas(
+    object as unknown as FabricImage,
+    artboard.width,
+    artboard.height,
+    fit,
+    { left: artboard.left, top: artboard.top },
+  )
   object.imageFit = fit
   object.set('dirty', true)
   canvas.requestRenderAll()

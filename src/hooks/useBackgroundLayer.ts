@@ -5,29 +5,30 @@ import { useCanvas } from '@/hooks/useCanvas'
 import {
   DEFAULT_BACKGROUND_FILL,
   ensureBackgroundLayer,
-  getBackgroundFill,
+  getBackgroundFillValue,
   setBackgroundFill,
 } from '@/lib/background-layer'
+import { createSolidFill, type FillValue } from '@/lib/fill-value'
 
 /**
- * 잠긴 배경 레이어 확보·색상 변경 훅
- * @returns 배경 색상 API
+ * 잠긴 배경 레이어 확보·채움 변경 훅
+ * @returns 배경 채움 API
  */
 export function useBackgroundLayer() {
   const { canvas, isReady, canvasSizeId } = useCanvas()
-  const [fill, setFill] = useState(DEFAULT_BACKGROUND_FILL)
+  const [fill, setFill] = useState<FillValue>(createSolidFill(DEFAULT_BACKGROUND_FILL))
 
   /**
-   * 배경이 항상 존재하도록 보정하고 색상 state를 동기화한다.
+   * 배경이 항상 존재하도록 보정하고 채움 state를 동기화한다.
    * @returns {void}
    */
   const syncFromCanvas = useCallback(() => {
     if (!canvas) {
-      setFill(DEFAULT_BACKGROUND_FILL)
+      setFill(createSolidFill(DEFAULT_BACKGROUND_FILL))
       return
     }
     ensureBackgroundLayer(canvas)
-    setFill(getBackgroundFill(canvas))
+    setFill(getBackgroundFillValue(canvas))
   }, [canvas])
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export function useBackgroundLayer() {
     }
 
     const handleSync = () => {
-      setFill(getBackgroundFill(canvas))
+      setFill(getBackgroundFillValue(canvas))
     }
 
     canvas.on('object:modified', handleSync)
@@ -55,17 +56,17 @@ export function useBackgroundLayer() {
   }, [canvas])
 
   /**
-   * 배경 색상을 변경한다.
-   * @param {string} hex - 선택 색상
+   * 배경 채움을 변경한다.
+   * @param {FillValue} next
    * @returns {void}
    */
   const applyFill = useCallback(
-    (hex: string) => {
+    (next: FillValue) => {
       if (!canvas) {
         return
       }
-      setBackgroundFill(canvas, hex)
-      setFill(hex)
+      setBackgroundFill(canvas, next)
+      setFill(next)
     },
     [canvas],
   )

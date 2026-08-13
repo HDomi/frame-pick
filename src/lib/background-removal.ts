@@ -1,10 +1,16 @@
 import {
-  CUTOUT_DEFAULT_MODEL,
   CUTOUT_LIGHT_MODEL,
   CUTOUT_MODEL_BASE_URL,
+  CUTOUT_QUALITY_MODEL,
   CUTOUT_TIMEOUT_MS,
   ONNX_WASM_CDN,
+  type CutoutQuality,
 } from '@/lib/cutout-constants'
+import { cleanupCutoutFringe } from '@/lib/cutout-alpha-cleanup'
+import {
+  punchHolesFromSourceBackground,
+  removeSolidBackground,
+} from '@/lib/cutout-solid-bg'
 
 export type CutoutProgress = {
   step: string
@@ -13,7 +19,9 @@ export type CutoutProgress = {
 }
 
 export type RemoveBackgroundOptions = {
+  /** @deprecated quality 사용 */
   preferLightModel?: boolean
+  quality?: CutoutQuality
   signal?: AbortSignal
   onProgress?: (info: CutoutProgress) => void
 }
@@ -32,6 +40,10 @@ async function loadRembg() {
       'u2netp',
       `${CUTOUT_MODEL_BASE_URL}/u2netp.onnx`,
     )
+    rembg.rembgConfig.setCustomModelPath(
+      'silueta',
+      `${CUTOUT_MODEL_BASE_URL}/silueta.onnx`,
+    )
 
     try {
       const ort = await import('onnxruntime-web')
@@ -42,6 +54,22 @@ async function loadRembg() {
     configured = true
   }
   return rembg
+}
+
+/**
+ * 고품질 모델 파일이 배포돼 있는지 확인한다.
+ * @returns {Promise<boolean>}
+ */
+export async function isQualityModelAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch(`${CUTOUT_MODEL_BASE_URL}/silueta.onnx`, {
+      method: 'HEAD',
+      cache: 'no-cache',
+    })
+    return response.ok
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -92,6 +120,18 @@ function withTimeout<T>(
 }
 
 /**
+ * 품질 옵션에 따른 모델명을 고른다.
+ * @param {CutoutQuality} quality
+ * @returns {string}
+ */
+function resolveModelName(quality: CutoutQuality): string {
+  if (quality === 'fast') {
+    return CUTOUT_LIGHT_MODEL
+  }
+  return CUTOUT_QUALITY_MODEL
+}
+
+/**
  * WASM 기반 배경 제거를 동적 로드 후 실행한다.
  * @param {Blob | File} imageSource - 원본 이미지
  * @param {RemoveBackgroundOptions} [options] - 옵션
@@ -101,8 +141,46 @@ export async function removeBackground(
   imageSource: Blob | File,
   options: RemoveBackgroundOptions = {},
 ): Promise<Blob> {
+  const quality: CutoutQuality =
+    options.quality ??
+    (options.preferLightModel ? 'fast' : 'quality')
+
+  options.onProgress?.({
+    step: 'processing',
+    progress: 5,
+    message: quality === 'solid' ? '단색 배경 분석 중…' : '모델 준비 중…',
+  })
+
+  if (quality === 'solid') {
+    options.onProgress?.({
+      step: 'processing',
+      progress: 40,
+      message: '단색 배경 제거 중…',
+    })
+    const solid = await removeSolidBackground(imageSource)
+    options.onProgress?.({
+      step: 'complete',
+      progress: 100,
+      message: '완료',
+    })
+    return solid
+  }
+
   const rembg = await loadRembg()
-  const modelName = options.preferLightModel ? CUTOUT_LIGHT_MODEL : CUTOUT_DEFAULT_MODEL
+  let modelName = resolveModelName(quality)
+
+  if (modelName === CUTOUT_QUALITY_MODEL) {
+    const available = await isQualityModelAvailable()
+    if (!available) {
+      options.onProgress?.({
+        step: 'processing',
+        progress: 8,
+        message: '고품질 모델 없음 → 경량 모델로 진행…',
+      })
+      modelName = CUTOUT_LIGHT_MODEL
+    }
+  }
+
   const session = await rembg.newSession(modelName)
 
   const result = await withTimeout(
@@ -112,7 +190,7 @@ export async function removeBackground(
       onProgress: (info) => {
         options.onProgress?.({
           step: info.step,
-          progress: info.progress,
+          progress: Math.min(90, Math.round(info.progress * 0.9)),
           message: info.message,
         })
       },
@@ -121,5 +199,18 @@ export async function removeBackground(
     options.signal,
   )
 
-  return result
+  options.onProgress?.({
+    step: 'postprocessing',
+    progress: 92,
+    message: '안쪽 구멍·가장자리 정리 중…',
+  })
+  // AI 마스크가 메운 로고 구멍(단색 배경)을 원본 색으로 추가 천공
+  const punched = await punchHolesFromSourceBackground(imageSource, result)
+  const cleaned = await cleanupCutoutFringe(punched)
+  options.onProgress?.({
+    step: 'complete',
+    progress: 100,
+    message: '완료',
+  })
+  return cleaned
 }
