@@ -28,6 +28,9 @@ function getTypeLabel(type: LayerType, imageSource?: 'video' | 'upload'): string
   if (type === 'text') {
     return '텍스트'
   }
+  if (type === 'shape') {
+    return '도형'
+  }
   return '스티커'
 }
 

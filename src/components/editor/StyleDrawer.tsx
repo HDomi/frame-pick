@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui'
 import { useCanvas } from '@/hooks/useCanvas'
 import { isBackgroundObject } from '@/lib/background-layer'
+import { isEditorShapeObject } from '@/lib/editor-shapes'
 import type { LayerAwareObject } from '@/lib/layers'
 import { cn } from '@/lib/cn'
 
@@ -38,6 +39,9 @@ function resolveStyleTab(object: unknown): StyleTab | null {
     object instanceof Textbox
   ) {
     return 'text'
+  }
+  if (layer.layerType === 'shape' || isEditorShapeObject(object as never)) {
+    return 'shape'
   }
   return null
 }

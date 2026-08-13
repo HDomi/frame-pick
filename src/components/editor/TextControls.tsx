@@ -1,16 +1,21 @@
 'use client'
 
-import { Button, ColorPicker, FillPicker, FormField } from '@/components/ui'
+import FormatBoldIcon from '@mui/icons-material/FormatBold'
+import FormatItalicIcon from '@mui/icons-material/FormatItalic'
+import FormatStrikethroughIcon from '@mui/icons-material/FormatStrikethrough'
+import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined'
+import { Button, ColorPicker, FillPicker, FormField, IconButton } from '@/components/ui'
 import { useRecentColors } from '@/hooks/useRecentColors'
 import { useTextFill } from '@/hooks/useTextFill'
 import { useTextStyle } from '@/hooks/useTextStyle'
 import { EDITOR_FONT_FAMILY } from '@/lib/editor-font'
 import type { FillValue } from '@/lib/fill-value'
+import { EDITOR_GOOGLE_FONTS } from '@/lib/google-fonts'
 import { TEXT_PRESET_CATEGORIES } from '@/lib/text-presets'
 import { cn } from '@/lib/cn'
 
 /**
- * 텍스트 폰트/외곽선/그림자/프리셋 컨트롤
+ * 텍스트 폰트/효과/외곽선/그림자/프리셋 컨트롤
  * @returns {React.ReactElement}
  */
 export function TextControls() {
@@ -18,6 +23,8 @@ export function TextControls() {
   const { style, hasSelection: hasStyleSelection, applyStylePatch, applyPreset } = useTextStyle()
   const { recentColors, rememberColor } = useRecentColors()
   const rangeSelected = hasSelection || hasStyleSelection
+  const isBold = style.fontWeight === 'bold' || style.fontWeight === '700' || Number(style.fontWeight) >= 700
+  const isItalic = style.fontStyle === 'italic' || style.fontStyle === 'oblique'
 
   /**
    * 채움 변경
@@ -29,7 +36,6 @@ export function TextControls() {
     if (!applied) {
       return
     }
-    // applyFill이 캔버스 fill을 이미 적용함 — applyStylePatch(fill)는 그라데이션을 덮어쓰므로 호출하지 않음
     if (next.mode === 'solid') {
       void rememberColor(next.color)
     } else {
@@ -77,10 +83,79 @@ export function TextControls() {
             applyStylePatch({ fontFamily: event.target.value })
           }}
         >
-          <option value={EDITOR_FONT_FAMILY}>Noto Sans KR</option>
+          <option value={EDITOR_FONT_FAMILY} style={{ fontFamily: EDITOR_FONT_FAMILY }}>
+            Noto Sans KR
+          </option>
+          {EDITOR_GOOGLE_FONTS.map((font) => (
+            <option key={font.id} value={font.family} style={{ fontFamily: font.family }}>
+              {font.label}
+            </option>
+          ))}
           <option value="sans-serif">Sans Serif</option>
           <option value="serif">Serif</option>
         </select>
+      </FormField>
+
+      <FormField label="글자 효과">
+        <div className="flex flex-wrap gap-1">
+          <IconButton
+            label="굵게"
+            disabled={!hasTextTarget}
+            className={cn(
+              'size-9 border border-[var(--color-border)]',
+              isBold && 'border-[var(--color-accent)] bg-[var(--color-accent)]/15',
+            )}
+            onClick={() => {
+              applyStylePatch({ fontWeight: isBold ? 'normal' : '700' })
+            }}
+          >
+            <FormatBoldIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+          <IconButton
+            label="기울임"
+            disabled={!hasTextTarget}
+            className={cn(
+              'size-9 border border-[var(--color-border)]',
+              isItalic && 'border-[var(--color-accent)] bg-[var(--color-accent)]/15',
+            )}
+            onClick={() => {
+              applyStylePatch({ fontStyle: isItalic ? 'normal' : 'italic' })
+            }}
+          >
+            <FormatItalicIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+          <IconButton
+            label="밑줄"
+            disabled={!hasTextTarget}
+            className={cn(
+              'size-9 border border-[var(--color-border)]',
+              style.underline && 'border-[var(--color-accent)] bg-[var(--color-accent)]/15',
+            )}
+            onClick={() => {
+              applyStylePatch({ underline: !style.underline })
+            }}
+          >
+            <FormatUnderlinedIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+          <IconButton
+            label="취소선"
+            disabled={!hasTextTarget}
+            className={cn(
+              'size-9 border border-[var(--color-border)]',
+              style.linethrough && 'border-[var(--color-accent)] bg-[var(--color-accent)]/15',
+            )}
+            onClick={() => {
+              applyStylePatch({ linethrough: !style.linethrough })
+            }}
+          >
+            <FormatStrikethroughIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+        </div>
+        {rangeSelected ? (
+          <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+            드래그로 고른 글자에만 효과가 적용됩니다.
+          </p>
+        ) : null}
       </FormField>
 
       <FormField

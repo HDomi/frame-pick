@@ -4,10 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { IText, Shadow, Textbox, type FabricObject } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
 import { getArtboardBounds } from '@/lib/artboard'
-import { normalizeHexColor } from '@/lib/color-repository'
+import { colorToFabricColor, parseHexColor } from '@/lib/color-repository'
 import { DEFAULT_TEXT_FONT_SIZE } from '@/lib/constants'
 import { createEditorTextbox } from '@/lib/editor-text'
 import { EDITOR_FONT_FAMILY } from '@/lib/editor-font'
+import { ensureEditorFontLoaded } from '@/lib/fonts'
 import { parseFabricFill } from '@/lib/fill-value'
 import { createDefaultLayerName, createLayerId, ensureLayerMeta } from '@/lib/layers'
 import {
@@ -26,6 +27,10 @@ export interface TextStyleState {
   strokeWidth: number
   fontSize: number
   fontFamily: string
+  fontWeight: string
+  fontStyle: string
+  underline: boolean
+  linethrough: boolean
   shadowEnabled: boolean
   highlightEnabled: boolean
   highlightColor: string
@@ -71,6 +76,10 @@ export function useTextStyle() {
     strokeWidth: DEFAULT_TEXT_STROKE_WIDTH,
     fontSize: DEFAULT_TEXT_FONT_SIZE,
     fontFamily: EDITOR_FONT_FAMILY,
+    fontWeight: 'normal',
+    fontStyle: 'normal',
+    underline: false,
+    linethrough: false,
     shadowEnabled: false,
     highlightEnabled: false,
     highlightColor: '#000000',
@@ -100,26 +109,43 @@ export function useTextStyle() {
     const shadow = active.shadow as Shadow | null | undefined
     const fillValue = parseFabricFill(active.fill, DEFAULT_TEXT_FILL)
     let fontSize = Number(active.fontSize ?? DEFAULT_TEXT_FONT_SIZE)
+    let fontFamily = String(active.fontFamily ?? EDITOR_FONT_FAMILY)
+    let fontWeight = String(active.fontWeight ?? 'normal')
+    let fontStyle = String(active.fontStyle ?? 'normal')
+    let underline = Boolean(active.underline)
+    let linethrough = Boolean(active.linethrough)
 
     if (selectionActive) {
       const styles = active.getSelectionStyles(active.selectionStart, active.selectionEnd, true)
-      const styledSize = styles.find((entry) => entry.fontSize != null)?.fontSize
+      const pick = <K extends keyof (typeof styles)[number]>(key: K, fallback: unknown) => {
+        const hit = styles.find((entry) => entry[key] != null)
+        return hit?.[key] ?? fallback
+      }
+      const styledSize = pick('fontSize', fontSize)
       if (typeof styledSize === 'number') {
         fontSize = styledSize
       }
+      fontFamily = String(pick('fontFamily', fontFamily))
+      fontWeight = String(pick('fontWeight', fontWeight))
+      fontStyle = String(pick('fontStyle', fontStyle))
+      underline = Boolean(pick('underline', underline))
+      linethrough = Boolean(pick('linethrough', linethrough))
     }
 
     setStyle({
       fill: fillValue.mode === 'solid' ? fillValue.color : fillValue.colorA,
-      stroke:
-        normalizeHexColor(String(active.stroke ?? DEFAULT_TEXT_STROKE)) ?? DEFAULT_TEXT_STROKE,
+      stroke: parseHexColor(String(active.stroke ?? DEFAULT_TEXT_STROKE))?.hex ?? DEFAULT_TEXT_STROKE,
       strokeWidth: Number(active.strokeWidth ?? DEFAULT_TEXT_STROKE_WIDTH),
       fontSize,
-      fontFamily: String(active.fontFamily ?? EDITOR_FONT_FAMILY),
+      fontFamily,
+      fontWeight,
+      fontStyle,
+      underline,
+      linethrough,
       shadowEnabled: Boolean(shadow && (shadow.blur > 0 || shadow.offsetX || shadow.offsetY)),
       highlightEnabled: Boolean(active.textBackgroundColor),
       highlightColor:
-        normalizeHexColor(String(active.textBackgroundColor ?? '#000000')) ?? '#000000',
+        parseHexColor(String(active.textBackgroundColor ?? '#000000'))?.hex ?? '#000000',
     })
   }, [canvas])
 
@@ -150,7 +176,7 @@ export function useTextStyle() {
   }, [canvas, syncFromCanvas])
 
   /**
-   * 활성 텍스트에 부분 필드를 적용한다. fontSize는 글자 선택 시 부분 적용.
+   * 활성 텍스트에 부분 필드를 적용한다. 글자 선택 시 부분 스타일 지원.
    * @param {Partial<TextStyleState>} patch - 변경분
    * @returns {boolean}
    */
@@ -166,36 +192,60 @@ export function useTextStyle() {
 
       const selectionActive = hasTextRangeSelection(active)
 
+      /**
+       * 객체 전체 또는 선택 범위에 스타일 키를 적용한다.
+       * @param {Record<string, unknown>} stylePatch
+       * @returns {void}
+       */
+      const applyCharStyles = (stylePatch: Record<string, unknown>) => {
+        if (selectionActive) {
+          active.setSelectionStyles(stylePatch, active.selectionStart, active.selectionEnd)
+          return
+        }
+        Object.entries(stylePatch).forEach(([key, value]) => {
+          active.set(key as keyof TextObject, value as never)
+        })
+        const len = active.text?.length ?? 0
+        if (len > 0 && active.styles && Object.keys(active.styles).length > 0) {
+          active.setSelectionStyles(stylePatch, 0, len)
+        }
+      }
+
       if (typeof patch.fontSize === 'number') {
         const nextSize = Math.min(400, Math.max(8, Math.round(patch.fontSize)))
-        if (selectionActive) {
-          active.setSelectionStyles(
-            { fontSize: nextSize },
-            active.selectionStart,
-            active.selectionEnd,
-          )
-        } else {
-          active.set('fontSize', nextSize)
-          const len = active.text?.length ?? 0
-          if (len > 0 && active.styles && Object.keys(active.styles).length > 0) {
-            active.setSelectionStyles({ fontSize: nextSize }, 0, len)
-          }
-        }
+        applyCharStyles({ fontSize: nextSize })
         active.initDimensions()
         active.setCoords()
       }
 
       if (patch.fill) {
-        active.set('fill', patch.fill)
+        active.set('fill', colorToFabricColor(patch.fill))
       }
       if (patch.stroke) {
-        active.set('stroke', patch.stroke)
+        active.set('stroke', colorToFabricColor(patch.stroke))
       }
       if (typeof patch.strokeWidth === 'number') {
         active.set('strokeWidth', patch.strokeWidth)
       }
       if (patch.fontFamily) {
-        active.set('fontFamily', patch.fontFamily)
+        applyCharStyles({ fontFamily: patch.fontFamily })
+        void ensureEditorFontLoaded(patch.fontFamily).then(() => {
+          active.initDimensions()
+          active.set('dirty', true)
+          canvas.requestRenderAll()
+        })
+      }
+      if (patch.fontWeight != null) {
+        applyCharStyles({ fontWeight: patch.fontWeight })
+      }
+      if (patch.fontStyle != null) {
+        applyCharStyles({ fontStyle: patch.fontStyle })
+      }
+      if (typeof patch.underline === 'boolean') {
+        applyCharStyles({ underline: patch.underline })
+      }
+      if (typeof patch.linethrough === 'boolean') {
+        applyCharStyles({ linethrough: patch.linethrough })
       }
       if (typeof patch.shadowEnabled === 'boolean') {
         if (patch.shadowEnabled) {
@@ -218,11 +268,12 @@ export function useTextStyle() {
             ? patch.highlightEnabled
             : Boolean(active.textBackgroundColor)
         const color = patch.highlightColor ?? style.highlightColor
-        active.set('textBackgroundColor', enabled ? color : '')
+        active.set('textBackgroundColor', enabled ? colorToFabricColor(color) : '')
       }
 
       active.set('paintFirst', 'stroke')
       active.set('dirty', true)
+      active.initDimensions()
       canvas.requestRenderAll()
       canvas.fire('object:modified', { target: active })
       syncFromCanvas()

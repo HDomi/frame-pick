@@ -1,5 +1,10 @@
 import { Gradient } from 'fabric'
-import { normalizeHexColor } from '@/lib/color-repository'
+import {
+  clampAlpha,
+  formatHexColor,
+  normalizeHexColor,
+  parseHexColor,
+} from '@/lib/color-repository'
 
 /** 채움 모드 */
 export type FillMode = 'solid' | 'gradient'
@@ -42,24 +47,22 @@ const DIRECTION_COORDS: Record<
  * @returns {number}
  */
 export function clampOpacity(value: number): number {
-  if (Number.isNaN(value)) {
-    return 1
-  }
-  return Math.min(1, Math.max(0, value))
+  return clampAlpha(value)
 }
 
 /**
- * hex + alpha → rgba()
+ * hex(+선택 alpha) + opacity → rgba()
  * @param {string} hex
- * @param {number} opacity
+ * @param {number} [opacity] - 없으면 hex 알파 사용
  * @returns {string}
  */
-export function hexToRgba(hex: string, opacity: number): string {
-  const normalized = normalizeHexColor(hex) ?? '#ffffff'
-  const r = Number.parseInt(normalized.slice(1, 3), 16)
-  const g = Number.parseInt(normalized.slice(3, 5), 16)
-  const b = Number.parseInt(normalized.slice(5, 7), 16)
-  const a = clampOpacity(opacity)
+export function hexToRgba(hex: string, opacity?: number): string {
+  const parsed = parseHexColor(hex)
+  const rgb = parsed?.rgb ?? '#ffffff'
+  const a = opacity != null ? clampOpacity(opacity) : (parsed?.alpha ?? 1)
+  const r = Number.parseInt(rgb.slice(1, 3), 16)
+  const g = Number.parseInt(rgb.slice(3, 5), 16)
+  const b = Number.parseInt(rgb.slice(5, 7), 16)
   return `rgba(${r}, ${g}, ${b}, ${a})`
 }
 
@@ -69,48 +72,51 @@ export function hexToRgba(hex: string, opacity: number): string {
  * @returns {number}
  */
 export function readColorOpacity(color: string): number {
-  const rgba = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i.exec(
-    color.trim(),
-  )
-  if (rgba?.[4] != null) {
-    return clampOpacity(Number.parseFloat(rgba[4]))
+  const parsed = parseHexColor(color)
+  if (parsed) {
+    return parsed.alpha
   }
   return 1
 }
 
 /**
- * 색 문자열에서 hex만 추출한다.
+ * 색 문자열에서 #RRGGBB만 추출한다.
  * @param {string} color
  * @param {string} [fallback='#ffffff']
  * @returns {string}
  */
 export function colorToHex(color: string, fallback = '#ffffff'): string {
-  const normalized = normalizeHexColor(color)
-  if (normalized) {
-    return normalized
+  const parsed = parseHexColor(color)
+  if (parsed) {
+    return parsed.rgb
   }
-  const rgba = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(color.trim())
-  if (!rgba) {
-    return fallback
-  }
-  const toHex = (n: number) =>
-    Math.round(Math.min(255, Math.max(0, n)))
-      .toString(16)
-      .padStart(2, '0')
-  return `#${toHex(Number(rgba[1]))}${toHex(Number(rgba[2]))}${toHex(Number(rgba[3]))}`
+  return fallback
 }
 
 /**
- * 단색 FillValue
+ * FillValue용 표시 hex (#RRGGBB 또는 #RRGGBBAA)
  * @param {string} color
- * @param {number} [opacity=1]
+ * @param {number} opacity
+ * @returns {string}
+ */
+export function fillColorToPickerHex(color: string, opacity: number): string {
+  return formatHexColor(colorToHex(color), opacity)
+}
+
+/**
+ * 단색 FillValue — 8자리 hex면 알파를 opacity에 반영
+ * @param {string} color
+ * @param {number} [opacity] - 생략 시 hex 알파 또는 1
  * @returns {SolidFillValue}
  */
-export function createSolidFill(color: string, opacity = 1): SolidFillValue {
+export function createSolidFill(color: string, opacity?: number): SolidFillValue {
+  const parsed = parseHexColor(color)
+  const rgb = parsed?.rgb ?? colorToHex(color)
+  const nextOpacity = opacity != null ? clampOpacity(opacity) : (parsed?.alpha ?? 1)
   return {
     mode: 'solid',
-    color: normalizeHexColor(color) ?? colorToHex(color),
-    opacity: clampOpacity(opacity),
+    color: normalizeHexColor(rgb) ?? rgb,
+    opacity: nextOpacity,
   }
 }
 
@@ -125,15 +131,17 @@ export function createSolidFill(color: string, opacity = 1): SolidFillValue {
 export function createDefaultGradientFill(
   colorA = '#ffffff',
   colorB = '#3b82f6',
-  opacityA = 1,
-  opacityB = 1,
+  opacityA?: number,
+  opacityB?: number,
 ): GradientFillValue {
+  const parsedA = parseHexColor(colorA)
+  const parsedB = parseHexColor(colorB)
   return {
     mode: 'gradient',
-    colorA: normalizeHexColor(colorA) ?? '#ffffff',
-    colorB: normalizeHexColor(colorB) ?? '#3b82f6',
-    opacityA: clampOpacity(opacityA),
-    opacityB: clampOpacity(opacityB),
+    colorA: parsedA?.rgb ?? '#ffffff',
+    colorB: parsedB?.rgb ?? '#3b82f6',
+    opacityA: opacityA != null ? clampOpacity(opacityA) : (parsedA?.alpha ?? 1),
+    opacityB: opacityB != null ? clampOpacity(opacityB) : (parsedB?.alpha ?? 1),
     direction: 'horizontal',
   }
 }
@@ -163,6 +171,10 @@ export function fillValueToCssBackground(value: FillValue): string {
  * @returns {FillValue}
  */
 export function parseFabricFill(fill: unknown, fallback = '#ffffff'): FillValue {
+  if (fill == null || fill === '' || fill === 'transparent') {
+    return createSolidFill('#000000', 0)
+  }
+
   if (typeof fill === 'string') {
     return createSolidFill(colorToHex(fill, fallback), readColorOpacity(fill))
   }

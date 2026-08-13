@@ -6,6 +6,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import {
   createDefaultGradientFill,
   createSolidFill,
+  fillColorToPickerHex,
   fillValueToCssBackground,
   type FillMode,
   type FillValue,
@@ -134,17 +135,15 @@ export function FillPicker({
         <div className="flex flex-col gap-2">
           <ColorPicker
             label="색상"
-            value={value.mode === 'solid' ? value.color : value.colorA}
+            value={
+              value.mode === 'solid'
+                ? fillColorToPickerHex(value.color, value.opacity)
+                : fillColorToPickerHex(value.colorA, value.opacityA)
+            }
             recentColors={recentColors}
             disabled={disabled}
             onChange={(hex) => {
-              const opacity =
-                value.mode === 'solid'
-                  ? value.opacity
-                  : value.mode === 'gradient'
-                    ? value.opacityA
-                    : 1
-              onChange(createSolidFill(hex, opacity))
+              onChange(createSolidFill(hex))
             }}
           />
           <OpacitySlider
@@ -171,11 +170,12 @@ export function FillPicker({
           </FormField>
           <ColorPicker
             label="시작 색"
-            value={value.colorA}
+            value={fillColorToPickerHex(value.colorA, value.opacityA)}
             recentColors={recentColors}
             disabled={disabled}
             onChange={(hex) => {
-              onChange({ ...value, colorA: hex })
+              const solid = createSolidFill(hex)
+              onChange({ ...value, colorA: solid.color, opacityA: solid.opacity })
             }}
           />
           <OpacitySlider
@@ -188,11 +188,12 @@ export function FillPicker({
           />
           <ColorPicker
             label="끝 색"
-            value={value.colorB}
+            value={fillColorToPickerHex(value.colorB, value.opacityB)}
             recentColors={recentColors}
             disabled={disabled}
             onChange={(hex) => {
-              onChange({ ...value, colorB: hex })
+              const solid = createSolidFill(hex)
+              onChange({ ...value, colorB: solid.color, opacityB: solid.opacity })
             }}
           />
           <OpacitySlider

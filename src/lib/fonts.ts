@@ -1,4 +1,8 @@
 import { EDITOR_FONT_FAMILY } from '@/lib/editor-font'
+import {
+  ensureGoogleFontsStylesheet,
+  findGoogleFont,
+} from '@/lib/google-fonts'
 
 /**
  * document.fonts용 단일 패밀리명 (따옴표·폴백 제거)
@@ -22,10 +26,18 @@ export async function ensureEditorFontLoaded(
   }
 
   const primary = getPrimaryFontFamily(fontFamily)
+  const google = findGoogleFont(primary)
+  if (google) {
+    ensureGoogleFontsStylesheet()
+  }
+
+  const weights = google?.weights?.length ? google.weights : [400, 700]
 
   try {
-    await document.fonts.load(`700 64px "${primary}"`)
-    return document.fonts.check(`700 64px "${primary}"`)
+    await Promise.all(
+      weights.map((weight) => document.fonts.load(`${weight} 64px "${primary}"`)),
+    )
+    return weights.some((weight) => document.fonts.check(`${weight} 64px "${primary}"`))
   } catch {
     return false
   }

@@ -3,15 +3,17 @@
 import { useState } from 'react'
 import { BackgroundControls } from '@/components/editor/BackgroundControls'
 import { ImageFitControls } from '@/components/editor/ImageFitControls'
+import { ShapeControls } from '@/components/editor/ShapeControls'
 import { TextControls } from '@/components/editor/TextControls'
 import { PanelSection, SegmentedControl } from '@/components/ui'
 
-export type StyleTab = 'background' | 'image' | 'text'
+export type StyleTab = 'background' | 'image' | 'text' | 'shape'
 
 const STYLE_TABS: { value: StyleTab; label: string }[] = [
   { value: 'background', label: '배경' },
   { value: 'image', label: '이미지' },
   { value: 'text', label: '텍스트' },
+  { value: 'shape', label: '도형' },
 ]
 
 interface StylePanelContentProps {
@@ -20,7 +22,7 @@ interface StylePanelContentProps {
 }
 
 /**
- * 배경·이미지·텍스트 스타일 편집 본문 (탭)
+ * 배경·이미지·텍스트·도형 스타일 편집 본문 (탭)
  * @param {StylePanelContentProps} props
  * @returns {React.ReactElement}
  */
@@ -50,6 +52,7 @@ export function StylePanelContent({
         value={tab}
         options={STYLE_TABS}
         onChange={handleTabChange}
+        className="flex w-full flex-wrap"
       />
 
       {tab === 'background' ? (
@@ -67,6 +70,12 @@ export function StylePanelContent({
       {tab === 'text' ? (
         <PanelSection title="텍스트">
           <TextControls />
+        </PanelSection>
+      ) : null}
+
+      {tab === 'shape' ? (
+        <PanelSection title="도형">
+          <ShapeControls />
         </PanelSection>
       ) : null}
     </div>

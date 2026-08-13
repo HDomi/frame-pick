@@ -1,7 +1,11 @@
 'use client'
 
 import { useRef } from 'react'
+import ChangeHistoryOutlinedIcon from '@mui/icons-material/ChangeHistoryOutlined'
+import CropSquareOutlinedIcon from '@mui/icons-material/CropSquareOutlined'
+import HorizontalRuleIcon from '@mui/icons-material/HorizontalRule'
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import TitleIcon from '@mui/icons-material/Title'
 import { BackgroundRemovalButton } from '@/components/ai/BackgroundRemovalButton'
 import { StickerPanel } from '@/components/editor/StickerPanel'
@@ -12,7 +16,10 @@ import { useToast } from '@/contexts/ToastContext'
 import { useVideoSession } from '@/contexts/VideoSessionContext'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useCanvasImage } from '@/hooks/useCanvasImage'
+import { useCanvasShape } from '@/hooks/useCanvasShape'
 import { useCanvasText } from '@/hooks/useCanvasText'
+import type { EditorShapeKind } from '@/lib/editor-shapes'
+import { getShapeKindLabel } from '@/lib/editor-shapes'
 import { cn } from '@/lib/cn'
 
 /**
@@ -24,12 +31,13 @@ const TOOL_ICON_CLASS = cn(
 )
 
 /**
- * 좌측 툴바: 영상/이미지/누끼/텍스트/스티커
+ * 좌측 툴바: 영상/이미지/누끼/텍스트/도형/스티커
  * @returns {React.ReactElement} - 좌측 툴바
  */
 export function LeftToolbar() {
   const { isReady } = useCanvas()
   const { addText } = useCanvasText()
+  const { addShape } = useCanvasShape()
   const { addUploadedImage } = useCanvasImage()
   const { withLoading, isLoading } = useLoading()
   const { isExtracting } = useVideoSession()
@@ -49,6 +57,24 @@ export function LeftToolbar() {
     }
     await addText()
     toast({ message: '텍스트를 추가했습니다.', variant: 'success' })
+  }
+
+  /**
+   * 도형·직선 추가
+   * @param {EditorShapeKind} kind
+   * @returns {void}
+   */
+  const handleAddShape = (kind: EditorShapeKind) => {
+    if (!toolsEnabled) {
+      toast({ message: '추출/처리 중에는 편집할 수 없습니다.', variant: 'info' })
+      return
+    }
+    const ok = addShape(kind)
+    if (!ok) {
+      toast({ message: '도형 추가에 실패했습니다.', variant: 'error' })
+      return
+    }
+    toast({ message: `${getShapeKindLabel(kind)} 추가했습니다.`, variant: 'success' })
   }
 
   /**
@@ -133,9 +159,49 @@ export function LeftToolbar() {
           >
             <TitleIcon sx={{ fontSize: 22 }} />
           </IconButton>
+          <IconButton
+            label="사각형"
+            disabled={!toolsEnabled}
+            className={TOOL_ICON_CLASS}
+            onClick={() => {
+              handleAddShape('rect')
+            }}
+          >
+            <CropSquareOutlinedIcon sx={{ fontSize: 22 }} />
+          </IconButton>
+          <IconButton
+            label="원"
+            disabled={!toolsEnabled}
+            className={TOOL_ICON_CLASS}
+            onClick={() => {
+              handleAddShape('ellipse')
+            }}
+          >
+            <RadioButtonUncheckedIcon sx={{ fontSize: 22 }} />
+          </IconButton>
+          <IconButton
+            label="삼각형"
+            disabled={!toolsEnabled}
+            className={TOOL_ICON_CLASS}
+            onClick={() => {
+              handleAddShape('triangle')
+            }}
+          >
+            <ChangeHistoryOutlinedIcon sx={{ fontSize: 22 }} />
+          </IconButton>
+          <IconButton
+            label="직선"
+            disabled={!toolsEnabled}
+            className={TOOL_ICON_CLASS}
+            onClick={() => {
+              handleAddShape('line')
+            }}
+          >
+            <HorizontalRuleIcon sx={{ fontSize: 22 }} />
+          </IconButton>
         </div>
         <p className="text-[10px] text-[var(--color-text-muted)]">
-          이미지 · 누끼 스티커 · 텍스트 (마우스를 올리면 설명이 나옵니다)
+          이미지 · 누끼 · 텍스트 · 도형/직선
         </p>
       </PanelSection>
 

@@ -1,7 +1,7 @@
 /**
  * 에디터 레이어 종류
  */
-export type LayerType = 'background' | 'image' | 'text' | 'sticker'
+export type LayerType = 'background' | 'image' | 'text' | 'sticker' | 'shape'
 
 /**
  * 캔버스에 올라가는 레이어 메타데이터

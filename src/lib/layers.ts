@@ -40,6 +40,15 @@ export function inferLayerType(object: FabricObject): LayerType {
   if (type === 'image') {
     return 'image'
   }
+  if (
+    type === 'rect' ||
+    type === 'circle' ||
+    type === 'ellipse' ||
+    type === 'triangle' ||
+    type === 'line'
+  ) {
+    return 'shape'
+  }
   if (type === 'path' || type === 'group' || type === 'polyline') {
     return 'sticker'
   }
@@ -70,6 +79,19 @@ export function createDefaultLayerName(layerType: LayerType, object: FabricObjec
   }
   if (layerType === 'background') {
     return '배경'
+  }
+  if (layerType === 'shape') {
+    const type = object.type?.toLowerCase() ?? ''
+    if (type === 'line') {
+      return '직선'
+    }
+    if (type === 'circle' || type === 'ellipse') {
+      return '원'
+    }
+    if (type === 'triangle') {
+      return '삼각형'
+    }
+    return '사각형'
   }
   return '스티커'
 }

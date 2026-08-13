@@ -3,6 +3,7 @@
 import { AppHeader } from '@/components/layout/AppHeader'
 import { EditorWorkspace } from '@/components/layout/EditorWorkspace'
 import { FooterAd } from '@/components/layout/FooterAd'
+import { GoogleFontsLoader } from '@/components/editor/GoogleFontsLoader'
 import { CanvasProvider } from '@/contexts/CanvasContext'
 import { EditorSessionProvider } from '@/contexts/EditorSessionContext'
 import { AlertDialogProvider } from '@/contexts/AlertDialogContext'
@@ -23,6 +24,7 @@ export default function HomePage() {
             <EditorSessionProvider>
               <VideoSessionProvider>
                 <div className="flex h-dvh min-w-0 flex-col overflow-hidden">
+                  <GoogleFontsLoader />
                   <AppHeader />
                   <EditorWorkspace />
                   <FooterAd />

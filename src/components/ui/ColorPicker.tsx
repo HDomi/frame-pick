@@ -1,11 +1,19 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { HexColorPicker } from 'react-colorful'
+import { HexAlphaColorPicker } from 'react-colorful'
 import { FormField } from '@/components/ui/FormField'
-import { normalizeHexColor } from '@/lib/color-repository'
+import {
+  formatHexColor,
+  hexToCssColor,
+  normalizeHexColor,
+  parseHexColor,
+} from '@/lib/color-repository'
 import { PRESET_COLORS } from '@/lib/ui-constants'
 import { cn } from '@/lib/cn'
+
+/** 투명 프리셋 (8자리) */
+const TRANSPARENT_HEX = '#00000000'
 
 interface ColorPickerProps {
   value: string
@@ -13,11 +21,13 @@ interface ColorPickerProps {
   label?: string
   disabled?: boolean
   helperText?: string
+  /** false면 알파 UI·8자리 입력 숨김 (기본 true) */
+  allowAlpha?: boolean
   onChange: (hex: string) => void
 }
 
 /**
- * 컴팩트 트리거 + 팝오버(피커·프리셋·최근색)
+ * 컴팩트 트리거 + 팝오버(알파 피커·프리셋·최근색). #RRGGBB / #RRGGBBAA 지원.
  * @param {ColorPickerProps} props - 피커 props
  * @returns {React.ReactElement}
  */
@@ -27,13 +37,18 @@ export function ColorPicker({
   label = '색상',
   disabled = false,
   helperText,
+  allowAlpha = true,
   onChange,
 }: ColorPickerProps) {
   const [open, setOpen] = useState(false)
   const [hexInput, setHexInput] = useState(value)
   const rootRef = useRef<HTMLDivElement>(null)
   const panelId = useId()
-  const current = normalizeHexColor(value) ?? '#ffffff'
+  const parsed = parseHexColor(value)
+  const current = parsed?.hex ?? '#ffffff'
+  const pickerColor = formatHexColor(parsed?.rgb ?? '#ffffff', parsed?.alpha ?? 1, {
+    forceAlpha: true,
+  })
 
   useEffect(() => {
     setHexInput(current)
@@ -83,8 +98,11 @@ export function ColorPicker({
     if (!normalized || disabled) {
       return
     }
-    setHexInput(normalized)
-    onChange(normalized)
+    const nextValue = allowAlpha
+      ? normalized
+      : (parseHexColor(normalized)?.rgb ?? normalized)
+    setHexInput(nextValue)
+    onChange(nextValue)
   }
 
   return (
@@ -100,15 +118,26 @@ export function ColorPicker({
             title="색상 선택"
             className={cn(
               'size-9 shrink-0 rounded-md border border-[var(--color-border)] shadow-inner transition-transform hover:scale-[1.02] disabled:opacity-50',
+              'bg-[length:10px_10px]',
               open && 'ring-2 ring-[var(--color-accent)]',
             )}
-            style={{ backgroundColor: current }}
+            style={{
+              backgroundImage:
+                'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+              backgroundPosition: '0 0, 0 5px, 5px -5px, -5px 0',
+              backgroundColor: 'transparent',
+            }}
             onClick={() => {
               if (!disabled) {
                 setOpen((prev) => !prev)
               }
             }}
-          />
+          >
+            <span
+              className="block size-full rounded-[5px]"
+              style={{ backgroundColor: hexToCssColor(current) }}
+            />
+          </button>
           <input
             type="text"
             value={hexInput}
@@ -122,7 +151,7 @@ export function ColorPicker({
               }
             }}
             className="min-w-0 flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 py-1.5 font-mono text-xs"
-            placeholder="#ffffff"
+            placeholder={allowAlpha ? '#rrggbbaa' : '#rrggbb'}
           />
         </div>
       </FormField>
@@ -137,18 +166,27 @@ export function ColorPicker({
             'rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xl',
           )}
         >
-          <div className="color-picker-popover [&_.react-colorful]:h-[140px] [&_.react-colorful]:w-full">
-            <HexColorPicker color={current} onChange={commitColor} />
+          <div className="color-picker-popover [&_.react-colorful]:h-[160px] [&_.react-colorful]:w-full">
+            <HexAlphaColorPicker color={pickerColor} onChange={commitColor} />
           </div>
 
           <div className="flex flex-col gap-1">
             <span className="text-[10px] text-[var(--color-text-muted)]">프리셋</span>
             <div className="flex flex-wrap gap-1.5">
+              {allowAlpha ? (
+                <ColorSwatch
+                  hex={TRANSPARENT_HEX}
+                  label="투명"
+                  active={current === TRANSPARENT_HEX || (parsed?.alpha ?? 1) === 0}
+                  disabled={disabled}
+                  onSelect={commitColor}
+                />
+              ) : null}
               {PRESET_COLORS.map((hex) => (
                 <ColorSwatch
                   key={hex}
                   hex={hex}
-                  active={current === hex}
+                  active={parsed?.rgb === hex && (parsed?.alpha ?? 1) === 1}
                   disabled={disabled}
                   onSelect={commitColor}
                 />
@@ -164,7 +202,7 @@ export function ColorPicker({
                   <ColorSwatch
                     key={`recent-${hex}`}
                     hex={hex}
-                    active={current === hex}
+                    active={current === normalizeHexColor(hex)}
                     disabled={disabled}
                     onSelect={commitColor}
                   />
@@ -182,30 +220,44 @@ export function ColorPicker({
 
 interface ColorSwatchProps {
   hex: string
+  label?: string
   active?: boolean
   disabled?: boolean
   onSelect: (hex: string) => void
 }
 
 /**
- * 색상 스와치 버튼
+ * 색상 스와치 버튼 (투명 체커보드 배경)
  * @param {ColorSwatchProps} props - 스와치 props
  * @returns {React.ReactElement}
  */
-function ColorSwatch({ hex, active = false, disabled = false, onSelect }: ColorSwatchProps) {
+function ColorSwatch({
+  hex,
+  label,
+  active = false,
+  disabled = false,
+  onSelect,
+}: ColorSwatchProps) {
   return (
     <button
       type="button"
-      title={hex}
+      title={label ?? hex}
       disabled={disabled}
       onClick={() => onSelect(hex)}
       className={cn(
-        'size-6 rounded border transition-transform hover:scale-105 disabled:opacity-50',
+        'size-6 overflow-hidden rounded border transition-transform hover:scale-105 disabled:opacity-50',
         active
           ? 'border-[var(--color-accent)] ring-1 ring-[var(--color-accent)]'
           : 'border-[var(--color-border)]',
       )}
-      style={{ backgroundColor: hex }}
-    />
+      style={{
+        backgroundImage:
+          'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)',
+        backgroundSize: '8px 8px',
+        backgroundPosition: '0 0, 0 4px, 4px -4px, -4px 0',
+      }}
+    >
+      <span className="block size-full" style={{ backgroundColor: hexToCssColor(hex) }} />
+    </button>
   )
 }
