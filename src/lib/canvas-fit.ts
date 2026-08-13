@@ -5,7 +5,52 @@ import type { CanvasSize } from '@/lib/canvas-size'
 import { WORKSPACE_BG, ensureWorkspaceLayout } from '@/lib/image-sticker'
 
 /**
- * 컨테이너 너비에 맞춰 워크스페이스 캔버스를 CSS로만 스케일한다.
+ * Fabric 래퍼·캔버스에 CSS 표시 크기를 강제한다.
+ * cover fit이므로 maxWidth/Height로 클램프하지 않는다 (레터박스 = 비활성 영역이 됨).
+ * @param {Canvas} canvas - Fabric 캔버스
+ * @param {string} cssWidth - CSS 너비 (px)
+ * @param {string} cssHeight - CSS 높이 (px)
+ * @param {{ left: number; top: number }} [offset] - 컨테이너 안 중앙 오프셋 (음수 가능)
+ * @returns {void}
+ */
+function applyCanvasCssSize(
+  canvas: Canvas,
+  cssWidth: string,
+  cssHeight: string,
+  offset?: { left: number; top: number },
+): void {
+  const lower = canvas.lowerCanvasEl
+  const upper = canvas.upperCanvasEl
+  const wrapper = canvas.wrapperEl
+
+  if (wrapper) {
+    wrapper.style.position = 'absolute'
+    wrapper.style.left = offset ? `${offset.left}px` : '0'
+    wrapper.style.top = offset ? `${offset.top}px` : '0'
+    wrapper.style.width = cssWidth
+    wrapper.style.height = cssHeight
+    wrapper.style.maxWidth = 'none'
+    wrapper.style.maxHeight = 'none'
+    wrapper.style.overflow = 'hidden'
+    wrapper.style.boxSizing = 'border-box'
+  }
+
+  if (lower) {
+    lower.style.width = cssWidth
+    lower.style.height = cssHeight
+    lower.style.maxWidth = 'none'
+  }
+
+  if (upper) {
+    upper.style.width = cssWidth
+    upper.style.height = cssHeight
+    upper.style.maxWidth = 'none'
+  }
+}
+
+/**
+ * 컨테이너에 워크스페이스를 cover 스케일로 맞춘다.
+ * 셸 전체가 Fabric 히트 영역이 되어 팬·줌·마퀴가 일러스트 패스트보드처럼 전역에서 동작한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {HTMLElement} container - 뷰포트 컨테이너
  * @param {number} workspaceWidth - 워크스페이스 가로
@@ -18,15 +63,32 @@ export function fitCanvasToContainer(
   workspaceWidth: number,
   workspaceHeight: number,
 ): void {
-  const containerWidth = container.clientWidth
-  if (containerWidth <= 0 || workspaceWidth <= 0 || workspaceHeight <= 0) {
+  // dispose 직후 getter가 undefined를 반환할 수 있음
+  if (canvas.disposed || (!canvas.lowerCanvasEl && !canvas.wrapperEl)) {
     return
   }
 
-  const aspect = workspaceWidth / workspaceHeight
-  const displayHeight = containerWidth / aspect
-  const cssWidth = `${containerWidth}px`
+  const containerWidth = container.clientWidth
+  const containerHeight = container.clientHeight
+  if (
+    containerWidth <= 0 ||
+    containerHeight <= 0 ||
+    workspaceWidth <= 0 ||
+    workspaceHeight <= 0
+  ) {
+    return
+  }
+
+  // cover: 셸을 가득 채워 레터박스(비히트)를 없앤다. 넘치는 쪽은 overflow로 클립.
+  const scale = Math.max(containerWidth / workspaceWidth, containerHeight / workspaceHeight)
+  const displayWidth = workspaceWidth * scale
+  const displayHeight = workspaceHeight * scale
+  const cssWidth = `${displayWidth}px`
   const cssHeight = `${displayHeight}px`
+  const offset = {
+    left: (containerWidth - displayWidth) / 2,
+    top: (containerHeight - displayHeight) / 2,
+  }
 
   const needsLogicalReset =
     Math.abs(canvas.getWidth() - workspaceWidth) > 0.5 ||
@@ -44,23 +106,39 @@ export function fitCanvasToContainer(
 
   const lower = canvas.lowerCanvasEl
   const upper = canvas.upperCanvasEl
+  const wrapper = canvas.wrapperEl
+
+  if (!lower && !wrapper) {
+    return
+  }
+
   const cssChanged =
-    lower.style.width !== cssWidth ||
-    lower.style.height !== cssHeight ||
+    lower?.style.width !== cssWidth ||
+    lower?.style.height !== cssHeight ||
     upper?.style.width !== cssWidth ||
-    upper?.style.height !== cssHeight
+    upper?.style.height !== cssHeight ||
+    wrapper?.style.width !== cssWidth ||
+    wrapper?.style.height !== cssHeight ||
+    wrapper?.style.left !== `${offset.left}px` ||
+    wrapper?.style.top !== `${offset.top}px`
 
   if (cssChanged || needsLogicalReset) {
-    canvas.setDimensions(
-      {
-        width: cssWidth,
-        height: cssHeight,
-      },
-      { cssOnly: true },
-    )
+    try {
+      canvas.setDimensions(
+        {
+          width: cssWidth,
+          height: cssHeight,
+        },
+        { cssOnly: true },
+      )
+    } catch {
+      // dispose 직후 등 — 아래 수동 CSS로 복구
+    }
+    applyCanvasCssSize(canvas, cssWidth, cssHeight, offset)
     canvas.calcOffset()
     canvas.requestRenderAll()
   } else {
+    applyCanvasCssSize(canvas, cssWidth, cssHeight, offset)
     canvas.calcOffset()
   }
 }

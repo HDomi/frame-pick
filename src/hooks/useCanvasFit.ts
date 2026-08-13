@@ -30,6 +30,7 @@ export function useCanvasFit(
 ): void {
   const timerRef = useRef<number | null>(null)
   const lastWidthRef = useRef(0)
+  const lastHeightRef = useRef(0)
   const panelResizingRef = useRef(false)
 
   useEffect(() => {
@@ -42,16 +43,24 @@ export function useCanvasFit(
 
     /**
      * fit을 즉시 실행한다.
-     * @param {boolean} [force=false] - 동일 너비 스킵 무시
+     * @param {boolean} [force=false] - 동일 크기 스킵 무시
      * @returns {void}
      */
     const runFit = (force = false) => {
       const width = container.clientWidth
-      if (!force && width > 0 && Math.abs(width - lastWidthRef.current) < 1) {
+      const height = container.clientHeight
+      if (
+        !force &&
+        width > 0 &&
+        height > 0 &&
+        Math.abs(width - lastWidthRef.current) < 1 &&
+        Math.abs(height - lastHeightRef.current) < 1
+      ) {
         canvas.calcOffset()
         return
       }
       lastWidthRef.current = width
+      lastHeightRef.current = height
       fitCanvasToContainer(canvas, container, workspace.width, workspace.height)
     }
 

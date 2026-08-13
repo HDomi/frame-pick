@@ -22,7 +22,7 @@ export default function HomePage() {
           <CanvasProvider>
             <EditorSessionProvider>
               <VideoSessionProvider>
-                <div className="flex h-dvh flex-col overflow-hidden">
+                <div className="flex h-dvh min-w-0 flex-col overflow-hidden">
                   <AppHeader />
                   <EditorWorkspace />
                   <FooterAd />

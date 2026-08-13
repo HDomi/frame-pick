@@ -95,7 +95,10 @@ export function LeftToolbar() {
   }
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto bg-[var(--color-surface)] p-3">
+    <aside
+      className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto p-3 backdrop-blur-sm"
+      style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 92%, transparent)' }}
+    >
       <PanelSection title="영상 추출">
         <VideoUploader />
       </PanelSection>

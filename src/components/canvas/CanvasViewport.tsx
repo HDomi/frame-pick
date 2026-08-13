@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Canvas } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useCanvasFit } from '@/hooks/useCanvasFit'
@@ -10,14 +10,13 @@ import { enableOffArtboardInteraction, ensureWorkspaceLayout, WORKSPACE_BG } fro
 import { cn } from '@/lib/cn'
 
 /**
- * Fabric.js 16:9 아트보드 + 바깥 핸들용 워크스페이스 뷰포트
+ * Fabric.js 아트보드 + 패스트보드 — cover fit으로 셸 전체가 히트 영역 (z-0)
  * @returns {React.ReactElement} - 캔버스 영역
  */
 export function CanvasViewport() {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasElRef = useRef<HTMLCanvasElement>(null)
   const { canvas, canvasSize, registerCanvas } = useCanvas()
-  const workspace = useMemo(() => getWorkspaceSize(canvasSize), [canvasSize])
 
   useEffect(() => {
     const canvasEl = canvasElRef.current
@@ -54,17 +53,15 @@ export function CanvasViewport() {
   useCanvasFit(canvas, containerRef, canvasSize.width, canvasSize.height)
 
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3">
-      <div
-        ref={containerRef}
-        className={cn(
-          'w-full max-w-5xl overflow-visible rounded-md border border-[var(--color-border)] bg-[#0c0e12] shadow-lg',
-          '[&_.canvas-container]:mx-auto [&_.canvas-container]:!overflow-visible',
-        )}
-        style={{ aspectRatio: `${workspace.width} / ${workspace.height}` }}
-      >
-        <canvas ref={canvasElRef} />
-      </div>
+    <div
+      ref={containerRef}
+      className={cn(
+        'relative h-full w-full min-h-0 min-w-0 overflow-hidden',
+        '[&_.canvas-container]:!overflow-hidden',
+      )}
+      style={{ backgroundColor: WORKSPACE_BG }}
+    >
+      <canvas ref={canvasElRef} />
     </div>
   )
 }

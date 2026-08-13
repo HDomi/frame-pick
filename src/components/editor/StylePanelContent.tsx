@@ -6,7 +6,7 @@ import { ImageFitControls } from '@/components/editor/ImageFitControls'
 import { TextControls } from '@/components/editor/TextControls'
 import { PanelSection, SegmentedControl } from '@/components/ui'
 
-type StyleTab = 'background' | 'image' | 'text'
+export type StyleTab = 'background' | 'image' | 'text'
 
 const STYLE_TABS: { value: StyleTab; label: string }[] = [
   { value: 'background', label: '배경' },
@@ -14,16 +14,43 @@ const STYLE_TABS: { value: StyleTab; label: string }[] = [
   { value: 'text', label: '텍스트' },
 ]
 
+interface StylePanelContentProps {
+  tab?: StyleTab
+  onTabChange?: (tab: StyleTab) => void
+}
+
 /**
  * 배경·이미지·텍스트 스타일 편집 본문 (탭)
+ * @param {StylePanelContentProps} props
  * @returns {React.ReactElement}
  */
-export function StylePanelContent() {
-  const [tab, setTab] = useState<StyleTab>('text')
+export function StylePanelContent({
+  tab: controlledTab,
+  onTabChange,
+}: StylePanelContentProps) {
+  const [uncontrolledTab, setUncontrolledTab] = useState<StyleTab>('text')
+  const isControlled = controlledTab != null && onTabChange != null
+  const tab = isControlled ? controlledTab : uncontrolledTab
+
+  /**
+   * @param {StyleTab} next
+   * @returns {void}
+   */
+  const handleTabChange = (next: StyleTab) => {
+    if (isControlled) {
+      onTabChange(next)
+      return
+    }
+    setUncontrolledTab(next)
+  }
 
   return (
     <div className="flex flex-col gap-3">
-      <SegmentedControl value={tab} options={STYLE_TABS} onChange={setTab} />
+      <SegmentedControl
+        value={tab}
+        options={STYLE_TABS}
+        onChange={handleTabChange}
+      />
 
       {tab === 'background' ? (
         <PanelSection title="배경">

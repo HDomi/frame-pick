@@ -1,15 +1,9 @@
 'use client'
 
 import { useCallback } from 'react'
-import { IText } from 'fabric'
 import { useCanvas } from '@/hooks/useCanvas'
-import { getArtboardBounds, getArtboardCenter } from '@/lib/artboard'
-import {
-  DEFAULT_TEXT_FILL,
-  DEFAULT_TEXT_FONT_SIZE,
-  DEFAULT_TEXT_STROKE,
-  DEFAULT_TEXT_STROKE_WIDTH,
-} from '@/lib/constants'
+import { getArtboardBounds } from '@/lib/artboard'
+import { createEditorTextbox } from '@/lib/editor-text'
 import { EDITOR_FONT_FAMILY } from '@/lib/editor-font'
 import { ensureEditorFontLoaded } from '@/lib/fonts'
 import { createDefaultLayerName, createLayerId, ensureLayerMeta } from '@/lib/layers'
@@ -32,22 +26,13 @@ export function useCanvasText() {
 
     const fontLoaded = await ensureEditorFontLoaded()
     const fontFamily = fontLoaded ? EDITOR_FONT_FAMILY : 'sans-serif'
-    const fontSizeScale = canvasSize.width / 1920
     const bounds = getArtboardBounds(canvas, canvasSize)
-    const center = getArtboardCenter(bounds)
 
-    const text = new IText('텍스트를 입력하세요', {
-      left: center.left,
-      top: center.top,
-      originX: 'center',
-      originY: 'center',
-      fill: DEFAULT_TEXT_FILL,
-      stroke: DEFAULT_TEXT_STROKE,
-      strokeWidth: DEFAULT_TEXT_STROKE_WIDTH * fontSizeScale,
-      fontSize: DEFAULT_TEXT_FONT_SIZE * fontSizeScale,
+    const text = createEditorTextbox({
+      text: '텍스트를 입력하세요',
+      bounds,
+      fontSizeScale: canvasSize.width / 1920,
       fontFamily,
-      fontWeight: '700',
-      paintFirst: 'stroke',
     })
 
     const layer = ensureLayerMeta(text)

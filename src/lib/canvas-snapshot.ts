@@ -11,6 +11,7 @@ import {
   restoreImageOverlay,
   type OverlayAwareImage,
 } from '@/lib/image-overlay'
+import { normalizeCanvasTextObjects } from '@/lib/normalize-canvas-text'
 
 export interface EditorSnapshot {
   sizeId: CanvasSizeId
@@ -63,6 +64,8 @@ export async function applyCanvasJson(
     }
   })
   await Promise.all(restores)
+
+  normalizeCanvasTextObjects(canvas, artboard)
 
   canvas.discardActiveObject()
   canvas.calcOffset()

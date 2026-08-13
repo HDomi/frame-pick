@@ -15,8 +15,9 @@ import { cn } from '@/lib/cn'
  */
 export function TextControls() {
   const { fill, opacity, hasTextTarget, hasSelection, applyFill, applyOpacity } = useTextFill()
-  const { style, applyStylePatch, applyPreset } = useTextStyle()
+  const { style, hasSelection: hasStyleSelection, applyStylePatch, applyPreset } = useTextStyle()
   const { recentColors, rememberColor } = useRecentColors()
+  const rangeSelected = hasSelection || hasStyleSelection
 
   /**
    * 채움 변경
@@ -80,6 +81,53 @@ export function TextControls() {
           <option value="sans-serif">Sans Serif</option>
           <option value="serif">Serif</option>
         </select>
+      </FormField>
+
+      <FormField
+        label={
+          rangeSelected
+            ? `선택 글자 크기 (${Math.round(style.fontSize)})`
+            : `글자 크기 (${Math.round(style.fontSize)})`
+        }
+      >
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={8}
+            max={400}
+            step={1}
+            disabled={!hasTextTarget}
+            value={Math.min(400, Math.max(8, Math.round(style.fontSize)))}
+            className={cn('min-w-0 flex-1', !hasTextTarget && 'opacity-70')}
+            onChange={(event) => {
+              applyStylePatch({ fontSize: Number(event.target.value) })
+            }}
+          />
+          <input
+            type="number"
+            min={8}
+            max={400}
+            step={1}
+            disabled={!hasTextTarget}
+            value={Math.round(style.fontSize)}
+            className={cn(
+              'w-16 shrink-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-1.5 py-1 text-sm',
+              !hasTextTarget && 'opacity-70',
+            )}
+            onChange={(event) => {
+              const next = Number(event.target.value)
+              if (!Number.isFinite(next)) {
+                return
+              }
+              applyStylePatch({ fontSize: next })
+            }}
+          />
+        </div>
+        {hasTextTarget && rangeSelected ? (
+          <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+            드래그로 고른 글자에만 크기가 적용됩니다.
+          </p>
+        ) : null}
       </FormField>
 
       <FormField label={`외곽선 두께 (${Math.round(style.strokeWidth)})`}>
@@ -148,14 +196,14 @@ export function TextControls() {
       </FormField>
 
       <FillPicker
-        label={hasSelection ? '선택 글자 채움' : '텍스트 채움'}
+        label={rangeSelected ? '선택 글자 채움' : '텍스트 채움'}
         value={fill}
         recentColors={recentColors}
         disabled={!hasTextTarget}
-        allowGradient={!hasSelection}
+        allowGradient={!rangeSelected}
         helperText={
           hasTextTarget
-            ? hasSelection
+            ? rangeSelected
               ? '선택한 글자에만 단색이 적용됩니다.'
               : '텍스트를 더블클릭한 뒤 글자를 드래그하면 일부만 색칠할 수 있습니다.'
             : '캔버스에서 텍스트 레이어를 선택하거나 프리셋을 누르세요.'

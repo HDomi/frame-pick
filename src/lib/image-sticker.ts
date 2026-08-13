@@ -1,4 +1,5 @@
 import type { Canvas, FabricImage } from 'fabric'
+import { ActiveSelection } from 'fabric'
 import {
   getArtboardBounds,
   getArtboardCenter,
@@ -133,14 +134,62 @@ export function addImageStickerLayer(
 }
 
 /**
- * 배경이 아닌 객체가 아트보드 밖으로 나가도 선택 가능하게 둔다.
+ * 다중선택에서 배경을 제외한다.
+ * @param {Canvas} canvas
+ * @returns {void}
+ */
+function stripBackgroundFromSelection(canvas: Canvas): void {
+  const active = canvas.getActiveObject()
+  if (!(active instanceof ActiveSelection)) {
+    if (isBackgroundObject(active)) {
+      // 레이어 패널 등 프로그래밍 선택은 유지
+      return
+    }
+    return
+  }
+
+  const kept = active.getObjects().filter((object) => !isBackgroundObject(object))
+  if (kept.length === active.size()) {
+    return
+  }
+
+  canvas.discardActiveObject()
+  if (kept.length === 0) {
+    canvas.requestRenderAll()
+    return
+  }
+  if (kept.length === 1) {
+    canvas.setActiveObject(kept[0])
+    canvas.requestRenderAll()
+    return
+  }
+
+  const next = new ActiveSelection(kept, { canvas })
+  canvas.setActiveObject(next)
+  canvas.requestRenderAll()
+}
+
+/**
+ * 아트보드 밖 드래그 다중선택 + 아트보드 밖 객체 조작을 켠다.
+ * 배경은 클릭을 가로채지 않도록 evented=false (레이어 패널로만 선택).
  * @param {Canvas} canvas - 캔버스
  * @returns {void}
  */
 export function enableOffArtboardInteraction(canvas: Canvas): void {
   canvas.controlsAboveOverlay = true
   canvas.skipTargetFind = false
-  // 워크스페이스 전체에서 이벤트 수신
+  canvas.selection = true
+
+  const background = findBackgroundObject(canvas)
+  if (background) {
+    background.set({
+      selectable: false,
+      evented: false,
+      hasBorders: false,
+      hasControls: false,
+    })
+  }
+
   canvas.getObjects().forEach((object) => {
     if (isBackgroundObject(object)) {
       return
@@ -149,4 +198,14 @@ export function enableOffArtboardInteraction(canvas: Canvas): void {
       objectCaching: false,
     })
   })
+
+  /**
+   * @returns {void}
+   */
+  const handleSelection = () => {
+    stripBackgroundFromSelection(canvas)
+  }
+
+  canvas.on('selection:created', handleSelection)
+  canvas.on('selection:updated', handleSelection)
 }

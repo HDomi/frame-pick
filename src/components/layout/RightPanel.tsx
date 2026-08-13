@@ -10,7 +10,10 @@ import { PanelSection } from '@/components/ui'
  */
 export function RightPanel() {
   return (
-    <aside className="relative flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto bg-[var(--color-surface)] p-3">
+    <aside
+      className="relative flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 backdrop-blur-sm"
+      style={{ backgroundColor: 'color-mix(in srgb, var(--color-surface) 92%, transparent)' }}
+    >
       <PanelSection title="레이어" className="shrink-0">
         <div className="max-h-[38vh] min-h-0 overflow-y-auto pr-0.5">
           <LayerManager />
