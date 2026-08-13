@@ -27,12 +27,23 @@ export const metadata: Metadata = {
     siteName: 'Frame Pick',
     locale: 'ko_KR',
     type: 'website',
+    // metadataBase(SITE_URL)에 이미 `/frame-pick` 경로가 포함되어 있으므로
+    // 여기서 BASE_PATH를 덧붙이면 경로가 중복된다.
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Frame Pick — 영상 프레임을 추출해 유튜브 썸네일을 만드는 브라우저 에디터',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Frame Pick | 유튜브 썸네일 에디터',
     description:
       '서버 비용 없이 브라우저에서 영상 프레임을 추출하고 유튜브 썸네일을 편집하세요.',
+    images: ['/og-image.png'],
   },
 }
 
