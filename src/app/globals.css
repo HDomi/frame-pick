@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+
+:root {
+  --color-bg: #0f1115;
+  --color-surface: #181b22;
+  --color-surface-raised: #22262f;
+  --color-border: #2e3440;
+  --color-text: #e8eaed;
+  --color-text-muted: #9aa0a6;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    var(--font-noto-sans-kr),
+    'Noto Sans KR',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+button,
+[type='button'],
+[type='submit'],
+[type='reset'],
+[role='button'],
+input,
+select,
+textarea,
+label {
+  cursor: pointer;
+}
+
+button:disabled,
+[type='button']:disabled,
+[type='submit']:disabled,
+[type='reset']:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+label:has(input:disabled) {
+  cursor: not-allowed;
+}

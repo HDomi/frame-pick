@@ -1,0 +1,27 @@
+---
+description: Frame Pick — hook화·공통 컴포넌트화 우선
+alwaysApply: true
+---
+
+# Hook / 공통 컴포넌트 우선
+
+Frame Pick의 모든 기능·UI 작업에서 아래를 기본으로 한다.
+
+## 원칙
+
+1. **공통 UI는 `src/components/ui/`에 둔다**  
+   버튼, 모달, 프레임/섬네일, 드롭존, 패널 섹션, 폼 필드, progress 등 반복되는 마크업·스타일은 페이지/기능 컴포넌트에 인라인으로 복붙하지 말고 공통 컴포넌트로 추출한다.
+2. **브라우저/도메인 로직은 `src/hooks/`로 분리한다**  
+   Fabric 캔버스, 프레임 추출, 누끼, export, 레이어 동기화 등 상태·부수효과는 컴포넌트 JSX에 몰아넣지 말고 `useXxx` 훅으로 빼서 UI는 얇게 유지한다.
+3. **순수 유틸은 `src/lib/`**  
+   훅/컴포넌트와 무관한 변환·상수·추출 알고리즘은 lib에 둔다.
+4. **새 기능을 넣을 때**  
+   구현 전에 “이미 ui/hooks에 재사용 가능한가?”를 먼저 보고, 없으면 이번 작업에서 공통으로 뽑을지 판단한 뒤 기능 컴포넌트를 작성한다.
+5. **복붙 금지 신호**  
+   같은 Tailwind 덩어리·같은 이벤트/상태 패턴이 2곳 이상이면 추출 대상으로 본다.
+
+## 예시 경로
+
+- UI: `@/components/ui` (`Button`, `FrameThumb`, `Modal`, …)
+- Hooks: `@/hooks` (`useCanvas`, `useVideoFrames`, …)
+- Lib: `@/lib` (`cn`, `constants`, extractors, …)
