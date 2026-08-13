@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric'
+import { FabricImage } from 'fabric'
 import type { CanvasSizeId } from '@/lib/canvas-size'
 import { getCanvasSizeById } from '@/lib/canvas-size'
 import { getWorkspaceSize } from '@/lib/artboard'
@@ -6,6 +7,10 @@ import { ensureBackgroundLayer, isBackgroundObject } from '@/lib/background-laye
 import { fitCanvasToContainer } from '@/lib/canvas-fit'
 import { CANVAS_JSON_PROPERTIES } from '@/lib/editor-persist-constants'
 import { ensureWorkspaceLayout } from '@/lib/image-sticker'
+import {
+  restoreImageOverlay,
+  type OverlayAwareImage,
+} from '@/lib/image-overlay'
 
 export interface EditorSnapshot {
   sizeId: CanvasSizeId
@@ -50,6 +55,14 @@ export async function applyCanvasJson(
     : { width: 1920, height: 1080 }
   ensureWorkspaceLayout(canvas, artboard)
   ensureBackgroundLayer(canvas)
+
+  const restores: Promise<void>[] = []
+  canvas.getObjects().forEach((object) => {
+    if (object instanceof FabricImage) {
+      restores.push(restoreImageOverlay(object as OverlayAwareImage))
+    }
+  })
+  await Promise.all(restores)
 
   canvas.discardActiveObject()
   canvas.calcOffset()

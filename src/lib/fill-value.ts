@@ -10,12 +10,18 @@ export type GradientDirection = 'horizontal' | 'vertical' | 'diagonal'
 export interface SolidFillValue {
   mode: 'solid'
   color: string
+  /** 0~1 */
+  opacity: number
 }
 
 export interface GradientFillValue {
   mode: 'gradient'
   colorA: string
   colorB: string
+  /** 0~1 */
+  opacityA: number
+  /** 0~1 */
+  opacityB: number
   direction: GradientDirection
 }
 
@@ -31,14 +37,80 @@ const DIRECTION_COORDS: Record<
 }
 
 /**
- * 단색 FillValue를 만든다.
- * @param {string} color - hex
+ * 0~1 투명도를 클램프한다.
+ * @param {number} value
+ * @returns {number}
+ */
+export function clampOpacity(value: number): number {
+  if (Number.isNaN(value)) {
+    return 1
+  }
+  return Math.min(1, Math.max(0, value))
+}
+
+/**
+ * hex + alpha → rgba()
+ * @param {string} hex
+ * @param {number} opacity
+ * @returns {string}
+ */
+export function hexToRgba(hex: string, opacity: number): string {
+  const normalized = normalizeHexColor(hex) ?? '#ffffff'
+  const r = Number.parseInt(normalized.slice(1, 3), 16)
+  const g = Number.parseInt(normalized.slice(3, 5), 16)
+  const b = Number.parseInt(normalized.slice(5, 7), 16)
+  const a = clampOpacity(opacity)
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+}
+
+/**
+ * rgba/hex 문자열에서 불투명도를 읽는다.
+ * @param {string} color
+ * @returns {number}
+ */
+export function readColorOpacity(color: string): number {
+  const rgba = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i.exec(
+    color.trim(),
+  )
+  if (rgba?.[4] != null) {
+    return clampOpacity(Number.parseFloat(rgba[4]))
+  }
+  return 1
+}
+
+/**
+ * 색 문자열에서 hex만 추출한다.
+ * @param {string} color
+ * @param {string} [fallback='#ffffff']
+ * @returns {string}
+ */
+export function colorToHex(color: string, fallback = '#ffffff'): string {
+  const normalized = normalizeHexColor(color)
+  if (normalized) {
+    return normalized
+  }
+  const rgba = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(color.trim())
+  if (!rgba) {
+    return fallback
+  }
+  const toHex = (n: number) =>
+    Math.round(Math.min(255, Math.max(0, n)))
+      .toString(16)
+      .padStart(2, '0')
+  return `#${toHex(Number(rgba[1]))}${toHex(Number(rgba[2]))}${toHex(Number(rgba[3]))}`
+}
+
+/**
+ * 단색 FillValue
+ * @param {string} color
+ * @param {number} [opacity=1]
  * @returns {SolidFillValue}
  */
-export function createSolidFill(color: string): SolidFillValue {
+export function createSolidFill(color: string, opacity = 1): SolidFillValue {
   return {
     mode: 'solid',
-    color: normalizeHexColor(color) ?? '#ffffff',
+    color: normalizeHexColor(color) ?? colorToHex(color),
+    opacity: clampOpacity(opacity),
   }
 }
 
@@ -46,28 +118,34 @@ export function createSolidFill(color: string): SolidFillValue {
  * 기본 그라데이션 FillValue
  * @param {string} [colorA='#ffffff']
  * @param {string} [colorB='#3b82f6']
+ * @param {number} [opacityA=1]
+ * @param {number} [opacityB=1]
  * @returns {GradientFillValue}
  */
 export function createDefaultGradientFill(
   colorA = '#ffffff',
   colorB = '#3b82f6',
+  opacityA = 1,
+  opacityB = 1,
 ): GradientFillValue {
   return {
     mode: 'gradient',
     colorA: normalizeHexColor(colorA) ?? '#ffffff',
     colorB: normalizeHexColor(colorB) ?? '#3b82f6',
+    opacityA: clampOpacity(opacityA),
+    opacityB: clampOpacity(opacityB),
     direction: 'horizontal',
   }
 }
 
 /**
- * CSS 미리보기용 background 문자열
+ * CSS 미리보기용 background
  * @param {FillValue} value
  * @returns {string}
  */
 export function fillValueToCssBackground(value: FillValue): string {
   if (value.mode === 'solid') {
-    return value.color
+    return hexToRgba(value.color, value.opacity)
   }
   const angle =
     value.direction === 'vertical'
@@ -75,27 +153,31 @@ export function fillValueToCssBackground(value: FillValue): string {
       : value.direction === 'diagonal'
         ? '135deg'
         : '90deg'
-  return `linear-gradient(${angle}, ${value.colorA}, ${value.colorB})`
+  return `linear-gradient(${angle}, ${hexToRgba(value.colorA, value.opacityA)}, ${hexToRgba(value.colorB, value.opacityB)})`
 }
 
 /**
- * Fabric fill에서 UI용 FillValue를 추출한다.
+ * Fabric fill → FillValue
  * @param {unknown} fill
  * @param {string} [fallback='#ffffff']
  * @returns {FillValue}
  */
 export function parseFabricFill(fill: unknown, fallback = '#ffffff'): FillValue {
   if (typeof fill === 'string') {
-    return createSolidFill(normalizeHexColor(fill) ?? fallback)
+    return createSolidFill(colorToHex(fill, fallback), readColorOpacity(fill))
   }
 
-  if (fill instanceof Gradient) {
-    const stops = [...(fill.colorStops ?? [])].sort((a, b) => a.offset - b.offset)
-    const colorA =
-      normalizeHexColor(String(stops[0]?.color ?? fallback)) ?? fallback
-    const colorB =
-      normalizeHexColor(String(stops[stops.length - 1]?.color ?? colorA)) ?? colorA
-    const coords = fill.coords as { x1?: number; y1?: number; x2?: number; y2?: number }
+  const fromStops = (
+    stopsRaw: { offset: number; color: string }[],
+    coords: { x1?: number; y1?: number; x2?: number; y2?: number },
+  ): GradientFillValue => {
+    const stops = [...stopsRaw].sort((a, b) => a.offset - b.offset)
+    const first = stops[0]
+    const last = stops[stops.length - 1]
+    const colorA = colorToHex(String(first?.color ?? fallback), fallback)
+    const colorB = colorToHex(String(last?.color ?? colorA), colorA)
+    const opacityA = readColorOpacity(String(first?.color ?? 'rgba(0,0,0,1)'))
+    const opacityB = readColorOpacity(String(last?.color ?? 'rgba(0,0,0,1)'))
     const dx = Math.abs((coords.x2 ?? 0) - (coords.x1 ?? 0))
     const dy = Math.abs((coords.y2 ?? 0) - (coords.y1 ?? 0))
     let direction: GradientDirection = 'horizontal'
@@ -108,58 +190,51 @@ export function parseFabricFill(fill: unknown, fallback = '#ffffff'): FillValue 
       mode: 'gradient',
       colorA,
       colorB,
+      opacityA,
+      opacityB,
       direction,
     }
   }
 
-  // JSON 복원 직후 plain object인 경우
+  if (fill instanceof Gradient) {
+    return fromStops(
+      (fill.colorStops ?? []).map((stop) => ({
+        offset: stop.offset,
+        color: String(stop.color),
+      })),
+      fill.coords as { x1?: number; y1?: number; x2?: number; y2?: number },
+    )
+  }
+
   if (fill && typeof fill === 'object' && 'colorStops' in fill) {
     const raw = fill as {
-      type?: string
       coords?: { x1?: number; y1?: number; x2?: number; y2?: number }
       colorStops?: { offset: number; color: string }[]
     }
-    const stops = [...(raw.colorStops ?? [])].sort((a, b) => a.offset - b.offset)
-    const colorA =
-      normalizeHexColor(String(stops[0]?.color ?? fallback)) ?? fallback
-    const colorB =
-      normalizeHexColor(String(stops[stops.length - 1]?.color ?? colorA)) ?? colorA
-    const coords = raw.coords ?? {}
-    const dx = Math.abs((coords.x2 ?? 0) - (coords.x1 ?? 0))
-    const dy = Math.abs((coords.y2 ?? 0) - (coords.y1 ?? 0))
-    let direction: GradientDirection = 'horizontal'
-    if (dx < 0.01 && dy > 0.01) {
-      direction = 'vertical'
-    } else if (dx > 0.01 && dy > 0.01) {
-      direction = 'diagonal'
-    }
-    return { mode: 'gradient', colorA, colorB, direction }
+    return fromStops(raw.colorStops ?? [], raw.coords ?? {})
   }
 
   return createSolidFill(fallback)
 }
 
 /**
- * FillValue를 Fabric fill(string | Gradient)로 만든다.
+ * FillValue → Fabric fill
  * @param {FillValue} value
- * @returns {string | Gradient}
+ * @returns {string | Gradient<'linear'>}
  */
 export function createFabricFill(value: FillValue): string | Gradient<'linear'> {
   if (value.mode === 'solid') {
-    return normalizeHexColor(value.color) ?? '#ffffff'
+    return hexToRgba(value.color, value.opacity)
   }
 
-  const colorA = normalizeHexColor(value.colorA) ?? '#ffffff'
-  const colorB = normalizeHexColor(value.colorB) ?? '#3b82f6'
   const coords = DIRECTION_COORDS[value.direction]
-
   return new Gradient({
     type: 'linear',
     gradientUnits: 'percentage',
     coords,
     colorStops: [
-      { offset: 0, color: colorA },
-      { offset: 1, color: colorB },
+      { offset: 0, color: hexToRgba(value.colorA, value.opacityA) },
+      { offset: 1, color: hexToRgba(value.colorB, value.opacityB) },
     ],
   })
 }

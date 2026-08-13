@@ -13,6 +13,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useCanvasDownload } from '@/hooks/useCanvasDownload'
 import { useCanvasPreview } from '@/hooks/useCanvasPreview'
+import { formatCountdown, useCountdownTo } from '@/hooks/useCountdownTo'
 import {
   getExportExtension,
   resolveExportPixelSize,
@@ -51,6 +52,7 @@ export function AppHeader() {
     isHydrated,
     isSaving,
     lastSavedAt,
+    nextAutoSaveAt,
     canUndo,
     canRedo,
     saveDraftNow,
@@ -59,6 +61,7 @@ export function AppHeader() {
     redo,
   } = useEditorSession()
 
+  const autoSaveRemainingMs = useCountdownTo(nextAutoSaveAt)
   const controlsEnabled = isReady && isHydrated
 
   /**
@@ -132,9 +135,18 @@ export function AppHeader() {
           <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">
             유튜브 썸네일 에디터
           </span>
-          {lastSavedAt ? (
-            <span className="hidden text-[11px] text-[var(--color-text-muted)] md:inline">
-              저장 {formatSavedAt(lastSavedAt)}
+          {isHydrated ? (
+            <span
+              className="hidden text-[11px] text-[var(--color-text-muted)] md:inline"
+              title="최근 임시저장 · 다음 자동저장까지"
+            >
+              {lastSavedAt ? `저장 ${formatSavedAt(lastSavedAt)}` : '미저장'}
+              {nextAutoSaveAt ? (
+                <>
+                  {' · '}
+                  자동 {isSaving ? '저장 중…' : formatCountdown(autoSaveRemainingMs)}
+                </>
+              ) : null}
             </span>
           ) : null}
         </div>

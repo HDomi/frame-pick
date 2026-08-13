@@ -1,4 +1,9 @@
 import type { ReactNode } from 'react'
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
+import LockOpenOutlinedIcon from '@mui/icons-material/LockOpenOutlined'
+import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined'
 import { IconButton } from '@/components/ui/IconButton'
 import { cn } from '@/lib/cn'
 
@@ -71,19 +76,27 @@ export function LayerRow({
           {canToggleVisible && onToggleVisible ? (
             <IconButton
               label={visible ? '숨기기' : '보이기'}
-              className="size-7 text-[10px]"
+              className="size-7"
               onClick={onToggleVisible}
             >
-              {visible ? '보' : '숨'}
+              {visible ? (
+                <VisibilityIcon sx={{ fontSize: 16 }} />
+              ) : (
+                <VisibilityOffIcon sx={{ fontSize: 16 }} />
+              )}
             </IconButton>
           ) : null}
           {canToggleLock && onToggleLock ? (
             <IconButton
               label={locked ? '잠금 해제' : '잠금'}
-              className="size-7 text-[10px]"
+              className="size-7"
               onClick={onToggleLock}
             >
-              {locked ? '해' : '잠'}
+              {locked ? (
+                <LockOutlinedIcon sx={{ fontSize: 16 }} />
+              ) : (
+                <LockOpenOutlinedIcon sx={{ fontSize: 16 }} />
+              )}
             </IconButton>
           ) : null}
           <IconButton
@@ -113,10 +126,11 @@ export function LayerRow({
             </IconButton>
           ) : (
             <span
-              className="inline-flex size-7 items-center justify-center text-[10px] text-[var(--color-text-muted)]"
-              title="삭제 불가"
+              className="inline-flex size-7 items-center justify-center text-[var(--color-text-muted)]"
+              title="고정 (삭제 불가)"
+              aria-label="고정 (삭제 불가)"
             >
-              고
+              <PushPinOutlinedIcon sx={{ fontSize: 16 }} />
             </span>
           )}
         </div>

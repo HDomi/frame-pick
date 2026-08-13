@@ -48,7 +48,7 @@ interface ToastProviderProps {
 }
 
 /**
- * 좌상단 스택형 토스트 Provider
+ * 상단 중앙 스택형 토스트 Provider
  * @param {ToastProviderProps} props - children
  * @returns {React.ReactElement}
  */
@@ -126,7 +126,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
     <ToastContext.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed top-3 left-3 z-[80] flex w-[min(20rem,calc(100vw-1.5rem))] flex-col gap-2"
+        className="pointer-events-none fixed top-3 left-1/2 z-[80] flex w-[min(20rem,calc(100vw-1.5rem))] -translate-x-1/2 flex-col items-stretch gap-2"
         aria-live="polite"
       >
         {items.map((item) => (

@@ -66,7 +66,7 @@ export function EditorWorkspace() {
               onDragEnd={() => emitPanelResize('end')}
             />
             <div
-              className="min-h-0 shrink-0 overflow-hidden border-l border-[var(--color-border)]"
+              className="relative z-10 min-h-0 shrink-0 overflow-visible border-l border-[var(--color-border)]"
               style={{ width: `${layout.rightPanelPct}%` }}
             >
               <RightPanel />

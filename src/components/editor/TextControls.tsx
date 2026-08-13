@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn'
  * @returns {React.ReactElement}
  */
 export function TextControls() {
-  const { fill, hasTextTarget, hasSelection, applyFill } = useTextFill()
+  const { fill, opacity, hasTextTarget, hasSelection, applyFill, applyOpacity } = useTextFill()
   const { style, applyStylePatch, applyPreset } = useTextStyle()
   const { recentColors, rememberColor } = useRecentColors()
 
@@ -28,13 +28,12 @@ export function TextControls() {
     if (!applied) {
       return
     }
+    // applyFill이 캔버스 fill을 이미 적용함 — applyStylePatch(fill)는 그라데이션을 덮어쓰므로 호출하지 않음
     if (next.mode === 'solid') {
       void rememberColor(next.color)
-      applyStylePatch({ fill: next.color })
     } else {
       void rememberColor(next.colorA)
       void rememberColor(next.colorB)
-      applyStylePatch({ fill: next.colorA })
     }
   }
 
@@ -163,6 +162,21 @@ export function TextControls() {
         }
         onChange={handleFillChange}
       />
+
+      <FormField label={`레이어 투명도 (${Math.round(opacity * 100)}%)`}>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          disabled={!hasTextTarget}
+          value={Math.round(opacity * 100)}
+          className={cn('w-full', !hasTextTarget && 'opacity-70')}
+          onChange={(event) => {
+            applyOpacity(Number(event.target.value) / 100)
+          }}
+        />
+      </FormField>
     </div>
   )
 }

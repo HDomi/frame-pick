@@ -37,6 +37,8 @@ interface EditorSessionContextValue {
   isHydrated: boolean
   isSaving: boolean
   lastSavedAt: number | null
+  /** 다음 자동저장 예정 시각 (epoch ms) */
+  nextAutoSaveAt: number | null
   canUndo: boolean
   canRedo: boolean
   saveDraftNow: () => Promise<void>
@@ -64,13 +66,17 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
   const [isHydrated, setIsHydrated] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  const [nextAutoSaveAt, setNextAutoSaveAt] = useState<number | null>(null)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
 
   const isApplyingRef = useRef(false)
   const historyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const canvasSizeIdRef = useRef(canvasSizeId)
   canvasSizeIdRef.current = canvasSizeId
+  const persistDraftRef = useRef<() => Promise<void>>(async () => {})
+  const scheduleAutoSaveRef = useRef<() => void>(() => {})
 
   /**
    * undo/redo 버튼 상태를 갱신한다.
@@ -153,10 +159,10 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
   }, [canvas, recordHistory])
 
   /**
-   * 임시저장(드래프트)을 즉시 수행한다.
+   * 드래프트를 DB에 기록한다. (타이머 재예약 없음)
    * @returns {Promise<void>}
    */
-  const saveDraftNow = useCallback(async () => {
+  const persistDraft = useCallback(async () => {
     if (!canvas) {
       return
     }
@@ -170,6 +176,37 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
       setIsSaving(false)
     }
   }, [canvas, ensureDb])
+
+  persistDraftRef.current = persistDraft
+
+  /**
+   * 다음 자동저장을 예약한다.
+   * @returns {void}
+   */
+  const scheduleNextAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+    const at = Date.now() + AUTO_SAVE_INTERVAL_MS
+    setNextAutoSaveAt(at)
+    autoSaveTimerRef.current = setTimeout(() => {
+      void persistDraftRef.current().finally(() => {
+        scheduleAutoSaveRef.current()
+      })
+    }, AUTO_SAVE_INTERVAL_MS)
+  }, [])
+
+  scheduleAutoSaveRef.current = scheduleNextAutoSave
+
+  /**
+   * 임시저장(드래프트)을 즉시 수행하고 자동저장 타이머를 리셋한다.
+   * @returns {Promise<void>}
+   */
+  const saveDraftNow = useCallback(async () => {
+    await persistDraft()
+    scheduleNextAutoSave()
+  }, [persistDraft, scheduleNextAutoSave])
 
   /**
    * 에디터를 초기화한다.
@@ -200,14 +237,16 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
       const snapshot = createEditorSnapshot(canvas, canvasSizeIdRef.current)
       await pushHistoryStep(db, snapshot)
       setLastSavedAt(null)
+      setNextAutoSaveAt(null)
       await refreshHistoryFlags()
       toast({ message: '에디터를 초기화했습니다.', variant: 'success' })
+      scheduleNextAutoSave()
     } finally {
       requestAnimationFrame(() => {
         isApplyingRef.current = false
       })
     }
-  }, [canvas, confirm, ensureDb, refreshHistoryFlags, toast])
+  }, [canvas, confirm, ensureDb, refreshHistoryFlags, scheduleNextAutoSave, toast])
 
   /**
    * Undo
@@ -337,20 +376,23 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
     scheduleHistoryRecord()
   }, [canvas, canvasSizeId, isHydrated, scheduleHistoryRecord])
 
-  // 1분 자동저장
+  // 자동저장 타이머 (저장·수동저장 시마다 간격 리셋)
   useEffect(() => {
     if (!canvas || !isHydrated) {
+      setNextAutoSaveAt(null)
       return
     }
 
-    const timer = setInterval(() => {
-      void saveDraftNow()
-    }, AUTO_SAVE_INTERVAL_MS)
+    scheduleNextAutoSave()
 
     return () => {
-      clearInterval(timer)
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+        autoSaveTimerRef.current = null
+      }
+      setNextAutoSaveAt(null)
     }
-  }, [canvas, isHydrated, saveDraftNow])
+  }, [canvas, isHydrated, scheduleNextAutoSave])
 
   // 단축키
   useEffect(() => {
@@ -397,6 +439,7 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
       isHydrated,
       isSaving,
       lastSavedAt,
+      nextAutoSaveAt,
       canUndo,
       canRedo,
       saveDraftNow,
@@ -410,6 +453,7 @@ export function EditorSessionProvider({ children }: EditorSessionProviderProps) 
       isHydrated,
       isSaving,
       lastSavedAt,
+      nextAutoSaveAt,
       redo,
       resetEditor,
       saveDraftNow,

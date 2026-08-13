@@ -1,10 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { BackgroundControls } from '@/components/editor/BackgroundControls'
-import { ImageFitControls } from '@/components/editor/ImageFitControls'
+import { StylePanelContent } from '@/components/editor/StylePanelContent'
 import { LayerManager } from '@/components/editor/LayerManager'
-import { TextControls } from '@/components/editor/TextControls'
 import { LeftToolbar } from '@/components/layout/LeftToolbar'
 import { PanelSection, SegmentedControl } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -63,16 +61,8 @@ export function MobileEditorSheet() {
             </div>
           ) : null}
           {tab === 'style' ? (
-            <div className="flex flex-col gap-4 p-3">
-              <PanelSection title="배경">
-                <BackgroundControls />
-              </PanelSection>
-              <PanelSection title="이미지 Fit">
-                <ImageFitControls />
-              </PanelSection>
-              <PanelSection title="텍스트 / 스타일">
-                <TextControls />
-              </PanelSection>
+            <div className="p-3">
+              <StylePanelContent />
             </div>
           ) : null}
         </div>

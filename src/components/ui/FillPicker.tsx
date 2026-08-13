@@ -18,7 +18,6 @@ interface FillPickerProps {
   label?: string
   recentColors?: string[]
   disabled?: boolean
-  /** false면 단색만 (부분 글자 선택 등) */
   allowGradient?: boolean
   helperText?: string
   onChange: (value: FillValue) => void
@@ -36,7 +35,42 @@ const DIRECTION_OPTIONS: { value: GradientDirection; label: string }[] = [
 ]
 
 /**
- * 단색 / 선형 그라데이션 채움 피커
+ * 투명도 슬라이더
+ * @param {{ label: string; value: number; disabled?: boolean; onChange: (v: number) => void }} props
+ * @returns {React.ReactElement}
+ */
+function OpacitySlider({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string
+  value: number
+  disabled?: boolean
+  onChange: (value: number) => void
+}) {
+  const pct = Math.round(value * 100)
+  return (
+    <FormField label={`${label} (${pct}%)`}>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        disabled={disabled}
+        value={pct}
+        className={cn('w-full', disabled && 'opacity-70')}
+        onChange={(event) => {
+          onChange(Number(event.target.value) / 100)
+        }}
+      />
+    </FormField>
+  )
+}
+
+/**
+ * 단색 / 선형 그라데이션 채움 피커 (+ 투명도)
  * @param {FillPickerProps} props
  * @returns {React.ReactElement}
  */
@@ -61,12 +95,14 @@ export function FillPicker({
       return
     }
     if (nextMode === 'solid') {
-      const color = value.mode === 'gradient' ? value.colorA : value.color
-      onChange(createSolidFill(color))
+      if (value.mode === 'gradient') {
+        onChange(createSolidFill(value.colorA, value.opacityA))
+      }
       return
     }
-    const base = value.mode === 'solid' ? value.color : value.colorA
-    onChange(createDefaultGradientFill(base, value.mode === 'gradient' ? value.colorB : '#3b82f6'))
+    if (value.mode === 'solid') {
+      onChange(createDefaultGradientFill(value.color, '#3b82f6', value.opacity, 1))
+    }
   }
 
   return (
@@ -87,7 +123,7 @@ export function FillPicker({
         style={{
           background: fillValueToCssBackground(
             !allowGradient && value.mode === 'gradient'
-              ? createSolidFill(value.colorA)
+              ? createSolidFill(value.colorA, value.opacityA)
               : value,
           ),
         }}
@@ -95,26 +131,40 @@ export function FillPicker({
       />
 
       {mode === 'solid' || !allowGradient ? (
-        <ColorPicker
-          label="색상"
-          value={value.mode === 'solid' ? value.color : value.colorA}
-          recentColors={recentColors}
-          disabled={disabled}
-          onChange={(hex) => {
-            onChange(createSolidFill(hex))
-          }}
-        />
+        <div className="flex flex-col gap-2">
+          <ColorPicker
+            label="색상"
+            value={value.mode === 'solid' ? value.color : value.colorA}
+            recentColors={recentColors}
+            disabled={disabled}
+            onChange={(hex) => {
+              const opacity =
+                value.mode === 'solid'
+                  ? value.opacity
+                  : value.mode === 'gradient'
+                    ? value.opacityA
+                    : 1
+              onChange(createSolidFill(hex, opacity))
+            }}
+          />
+          <OpacitySlider
+            label="투명도"
+            value={value.mode === 'solid' ? value.opacity : value.opacityA}
+            disabled={disabled}
+            onChange={(opacity) => {
+              const color = value.mode === 'solid' ? value.color : value.colorA
+              onChange(createSolidFill(color, opacity))
+            }}
+          />
+        </div>
       ) : value.mode === 'gradient' ? (
         <div className="flex flex-col gap-2">
           <FormField label="방향">
             <SegmentedControl
-              value={value.mode === 'gradient' ? value.direction : 'horizontal'}
+              value={value.direction}
               disabled={disabled}
               options={DIRECTION_OPTIONS}
               onChange={(direction) => {
-                if (value.mode !== 'gradient') {
-                  return
-                }
                 onChange({ ...value, direction })
               }}
             />
@@ -125,12 +175,15 @@ export function FillPicker({
             recentColors={recentColors}
             disabled={disabled}
             onChange={(hex) => {
-              onChange({
-                mode: 'gradient',
-                colorA: hex,
-                colorB: value.colorB,
-                direction: value.direction,
-              })
+              onChange({ ...value, colorA: hex })
+            }}
+          />
+          <OpacitySlider
+            label="시작 투명도"
+            value={value.opacityA}
+            disabled={disabled}
+            onChange={(opacityA) => {
+              onChange({ ...value, opacityA })
             }}
           />
           <ColorPicker
@@ -139,12 +192,15 @@ export function FillPicker({
             recentColors={recentColors}
             disabled={disabled}
             onChange={(hex) => {
-              onChange({
-                mode: 'gradient',
-                colorA: value.colorA,
-                colorB: hex,
-                direction: value.direction,
-              })
+              onChange({ ...value, colorB: hex })
+            }}
+          />
+          <OpacitySlider
+            label="끝 투명도"
+            value={value.opacityB}
+            disabled={disabled}
+            onChange={(opacityB) => {
+              onChange({ ...value, opacityB })
             }}
           />
         </div>

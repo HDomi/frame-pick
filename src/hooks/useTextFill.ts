@@ -31,6 +31,7 @@ function isTextObject(object: FabricObject | null | undefined): object is TextOb
 export function useTextFill() {
   const { canvas } = useCanvas()
   const [fill, setFill] = useState<FillValue>(createSolidFill('#ffffff'))
+  const [opacity, setOpacity] = useState(1)
   const [hasTextTarget, setHasTextTarget] = useState(false)
   const [hasSelection, setHasSelection] = useState(false)
 
@@ -60,6 +61,7 @@ export function useTextFill() {
       active.selectionStart !== active.selectionEnd
 
     setHasSelection(selectionActive)
+    setOpacity(typeof active.opacity === 'number' ? active.opacity : 1)
 
     if (selectionActive) {
       const styles = active.getSelectionStyles(active.selectionStart, active.selectionEnd, true)
@@ -126,24 +128,36 @@ export function useTextFill() {
       // 부분 선택은 단색만
       if (selectionActive) {
         const solid =
-          next.mode === 'solid' ? next.color : next.mode === 'gradient' ? next.colorA : '#ffffff'
+          next.mode === 'solid'
+            ? next
+            : createSolidFill(next.colorA, next.opacityA)
+        const fabricFill = createFabricFill(solid)
         active.setSelectionStyles(
-          { fill: solid },
+          { fill: fabricFill as string },
           active.selectionStart,
           active.selectionEnd,
         )
         active.set('dirty', true)
         canvas.requestRenderAll()
         canvas.fire('object:modified', { target: active })
-        setFill(createSolidFill(solid))
+        setFill(solid)
         setHasSelection(true)
         return true
       }
 
       const fabricFill = createFabricFill(next)
-      active.set('fill', fabricFill)
+      // 편집 중이면 종료해 객체 fill이 보이도록
+      if (active.isEditing) {
+        active.exitEditing()
+      }
 
-      // 부분 스타일 fill이 그라데이션을 덮지 않도록 제거
+      active.set({
+        fill: fabricFill,
+        // 그라데이션은 캐시하면 단색처럼 보이는 경우가 있음
+        objectCaching: next.mode !== 'gradient',
+      })
+
+      // 문자별 fill이 객체 그라데이션을 덮지 않도록 제거
       if (next.mode === 'gradient' && active.styles) {
         for (const lineKey of Object.keys(active.styles)) {
           const line = active.styles[Number(lineKey)]
@@ -160,11 +174,12 @@ export function useTextFill() {
       } else if (active.styles && Object.keys(active.styles).length > 0) {
         const len = active.text?.length ?? 0
         if (len > 0 && next.mode === 'solid') {
-          active.setSelectionStyles({ fill: next.color }, 0, len)
+          active.setSelectionStyles({ fill: createFabricFill(next) as string }, 0, len)
         }
       }
 
       active.set('dirty', true)
+      active.setCoords()
       canvas.requestRenderAll()
       canvas.fire('object:modified', { target: active })
       setFill(next)
@@ -174,11 +189,38 @@ export function useTextFill() {
     [canvas],
   )
 
+  /**
+   * 텍스트 객체 전체 투명도(0~1)
+   * @param {number} next
+   * @returns {boolean}
+   */
+  const applyOpacity = useCallback(
+    (next: number) => {
+      if (!canvas) {
+        return false
+      }
+      const active = canvas.getActiveObject()
+      if (!isTextObject(active)) {
+        return false
+      }
+      const clamped = Math.min(1, Math.max(0, next))
+      active.set('opacity', clamped)
+      active.set('dirty', true)
+      canvas.requestRenderAll()
+      canvas.fire('object:modified', { target: active })
+      setOpacity(clamped)
+      return true
+    },
+    [canvas],
+  )
+
   return {
     fill,
+    opacity,
     hasTextTarget,
     hasSelection,
     applyFill,
+    applyOpacity,
     syncFromCanvas,
   }
 }

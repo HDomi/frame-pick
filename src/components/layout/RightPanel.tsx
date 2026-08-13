@@ -1,9 +1,7 @@
 'use client'
 
-import { BackgroundControls } from '@/components/editor/BackgroundControls'
-import { ImageFitControls } from '@/components/editor/ImageFitControls'
+import { StyleDrawer } from '@/components/editor/StyleDrawer'
 import { LayerManager } from '@/components/editor/LayerManager'
-import { TextControls } from '@/components/editor/TextControls'
 import { PanelSection } from '@/components/ui'
 
 /**
@@ -12,21 +10,15 @@ import { PanelSection } from '@/components/ui'
  */
 export function RightPanel() {
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col gap-4 overflow-y-auto bg-[var(--color-surface)] p-3">
-      <PanelSection title="배경">
-        <BackgroundControls />
+    <aside className="relative flex h-full min-h-0 w-full flex-col gap-3 overflow-y-auto bg-[var(--color-surface)] p-3">
+      <PanelSection title="레이어" className="shrink-0">
+        <div className="max-h-[38vh] min-h-0 overflow-y-auto pr-0.5">
+          <LayerManager />
+        </div>
       </PanelSection>
 
-      <PanelSection title="이미지 Fit">
-        <ImageFitControls />
-      </PanelSection>
-
-      <PanelSection title="레이어">
-        <LayerManager />
-      </PanelSection>
-
-      <PanelSection title="텍스트 / 스타일">
-        <TextControls />
+      <PanelSection title="스타일" className="flex min-h-0 flex-1 flex-col">
+        <StyleDrawer />
       </PanelSection>
     </aside>
   )

@@ -23,4 +23,5 @@ export const CANVAS_JSON_PROPERTIES = [
   'layerType',
   'imageSource',
   'imageFit',
+  'overlayFill',
 ] as const

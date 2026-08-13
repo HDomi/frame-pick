@@ -1,9 +1,11 @@
 'use client'
 
 import { useRef } from 'react'
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined'
+import TitleIcon from '@mui/icons-material/Title'
 import { BackgroundRemovalButton } from '@/components/ai/BackgroundRemovalButton'
 import { StickerPanel } from '@/components/editor/StickerPanel'
-import { Button, PanelSection } from '@/components/ui'
+import { IconButton, PanelSection } from '@/components/ui'
 import { VideoUploader } from '@/components/video/VideoUploader'
 import { useLoading } from '@/contexts/LoadingContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -11,6 +13,15 @@ import { useVideoSession } from '@/contexts/VideoSessionContext'
 import { useCanvas } from '@/hooks/useCanvas'
 import { useCanvasImage } from '@/hooks/useCanvasImage'
 import { useCanvasText } from '@/hooks/useCanvasText'
+import { cn } from '@/lib/cn'
+
+/**
+ * 툴바용 사각 아이콘 버튼 공통 클래스
+ */
+const TOOL_ICON_CLASS = cn(
+  'size-10 border border-[var(--color-border)] bg-[var(--color-surface-raised)]',
+  'hover:border-[var(--color-accent)] disabled:opacity-60',
+)
 
 /**
  * 좌측 툴바: 영상/이미지/누끼/텍스트/스티커
@@ -89,7 +100,7 @@ export function LeftToolbar() {
         <VideoUploader />
       </PanelSection>
 
-      <PanelSection title="이미지">
+      <PanelSection title="추가">
         <input
           ref={imageInputRef}
           type="file"
@@ -99,28 +110,30 @@ export function LeftToolbar() {
             void handleImageFileChange(event)
           }}
         />
-        <Button
-          variant="tool"
-          size="lg"
-          fullWidth
-          disabled={!toolsEnabled}
-          onClick={handleImageUploadClick}
-        >
-          이미지 업로드
-        </Button>
-        <BackgroundRemovalButton />
-      </PanelSection>
-
-      <PanelSection title="텍스트">
-        <Button
-          variant="tool"
-          size="lg"
-          fullWidth
-          disabled={!toolsEnabled}
-          onClick={handleAddText}
-        >
-          텍스트 추가
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <IconButton
+            label="이미지 업로드"
+            disabled={!toolsEnabled}
+            className={TOOL_ICON_CLASS}
+            onClick={handleImageUploadClick}
+          >
+            <ImageOutlinedIcon sx={{ fontSize: 22 }} />
+          </IconButton>
+          <BackgroundRemovalButton />
+          <IconButton
+            label="텍스트 추가"
+            disabled={!toolsEnabled}
+            className={TOOL_ICON_CLASS}
+            onClick={() => {
+              void handleAddText()
+            }}
+          >
+            <TitleIcon sx={{ fontSize: 22 }} />
+          </IconButton>
+        </div>
+        <p className="text-[10px] text-[var(--color-text-muted)]">
+          이미지 · 누끼 스티커 · 텍스트 (마우스를 올리면 설명이 나옵니다)
+        </p>
       </PanelSection>
 
       <PanelSection title="스티커">
