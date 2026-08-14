@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   description:
     '서버 비용 없이 브라우저에서 영상 프레임을 추출하고 유튜브 썸네일을 편집하세요.',
   metadataBase: new URL(SITE_URL),
+  keywords: ['유튜브', '썸네일', '에디터', '프레임 추출', '누끼', 'Frame Pick'],
+  robots: {
+    index: true,
+    follow: true,
+  },
   icons: {
     icon: [
       { url: `${BASE_PATH}/favicon.ico`, sizes: 'any' },

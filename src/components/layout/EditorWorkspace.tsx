@@ -9,6 +9,7 @@ import { ResizeHandle } from '@/components/ui'
 import { FramePickerDialog } from '@/components/video/FramePickerDialog'
 import { useCanvasEditLock } from '@/hooks/useCanvasEditLock'
 import { useCanvasClipboard } from '@/hooks/useCanvasClipboard'
+import { useCanvasSnap } from '@/hooks/useCanvasSnap'
 import { useIsMobileLayout } from '@/hooks/useMediaQuery'
 import { usePanelLayout } from '@/hooks/usePanelLayout'
 import { useTextOverflowGuard } from '@/hooks/useTextOverflowGuard'
@@ -40,6 +41,7 @@ export function EditorWorkspace() {
   const { shellRef, layout, resizeLeftByDelta, resizeRightByDelta } = usePanelLayout()
   useCanvasEditLock()
   useCanvasClipboard()
+  useCanvasSnap()
   useTextOverflowGuard()
 
   return (

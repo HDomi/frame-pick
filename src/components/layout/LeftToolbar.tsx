@@ -20,6 +20,11 @@ import { useCanvasShape } from '@/hooks/useCanvasShape'
 import { useCanvasText } from '@/hooks/useCanvasText'
 import type { EditorShapeKind } from '@/lib/editor-shapes'
 import { getShapeKindLabel } from '@/lib/editor-shapes'
+import {
+  formatBytesAsMb,
+  IMAGE_MAX_FILE_BYTES,
+  IMAGE_SIZE_WARN_BYTES,
+} from '@/lib/image-upload-constants'
 import { cn } from '@/lib/cn'
 
 /**
@@ -103,6 +108,19 @@ export function LeftToolbar() {
     if (!file.type.startsWith('image/')) {
       toast({ message: '이미지 파일만 업로드할 수 있습니다.', variant: 'error' })
       return
+    }
+    if (file.size > IMAGE_MAX_FILE_BYTES) {
+      toast({
+        message: `이미지는 ${formatBytesAsMb(IMAGE_MAX_FILE_BYTES)} 이하여야 합니다.`,
+        variant: 'error',
+      })
+      return
+    }
+    if (file.size >= IMAGE_SIZE_WARN_BYTES) {
+      toast({
+        message: `용량이 큰 이미지입니다 (${formatBytesAsMb(file.size)}). 처리가 느릴 수 있습니다.`,
+        variant: 'info',
+      })
     }
 
     try {

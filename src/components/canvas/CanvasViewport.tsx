@@ -61,7 +61,7 @@ export function CanvasViewport() {
       )}
       style={{ backgroundColor: WORKSPACE_BG }}
     >
-      <canvas ref={canvasElRef} />
+      <canvas ref={canvasElRef} aria-label="썸네일 편집 캔버스" role="img" />
     </div>
   )
 }

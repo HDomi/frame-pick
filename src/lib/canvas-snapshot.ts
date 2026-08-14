@@ -1,5 +1,5 @@
 import type { Canvas } from 'fabric'
-import { FabricImage } from 'fabric'
+import { ActiveSelection, FabricImage } from 'fabric'
 import type { CanvasSizeId } from '@/lib/canvas-size'
 import { getCanvasSizeById } from '@/lib/canvas-size'
 import { getWorkspaceSize } from '@/lib/artboard'
@@ -11,11 +11,26 @@ import {
   restoreImageOverlay,
   type OverlayAwareImage,
 } from '@/lib/image-overlay'
+import type { LayerAwareObject } from '@/lib/layers'
 import { normalizeCanvasTextObjects } from '@/lib/normalize-canvas-text'
 
 export interface EditorSnapshot {
   sizeId: CanvasSizeId
   canvasJson: string
+  /** undo 후 선택 복원용 layerId 목록 */
+  activeLayerIds?: string[]
+}
+
+/**
+ * 현재 선택 객체의 layerId 목록을 수집한다.
+ * @param {Canvas} canvas
+ * @returns {string[]}
+ */
+function collectActiveLayerIds(canvas: Canvas): string[] {
+  return canvas
+    .getActiveObjects()
+    .map((object) => (object as LayerAwareObject).layerId)
+    .filter((id): id is string => Boolean(id))
 }
 
 /**
@@ -25,10 +40,13 @@ export interface EditorSnapshot {
  * @returns {EditorSnapshot} - 스냅샷
  */
 export function createEditorSnapshot(canvas: Canvas, sizeId: CanvasSizeId): EditorSnapshot {
-  const json = canvas.toObject([...CANVAS_JSON_PROPERTIES])
+  const json = canvas.toObject([...CANVAS_JSON_PROPERTIES]) as Record<string, unknown>
+  const activeLayerIds = collectActiveLayerIds(canvas)
+  json.activeLayerIds = activeLayerIds
   return {
     sizeId,
     canvasJson: JSON.stringify(json),
+    activeLayerIds,
   }
 }
 
@@ -36,6 +54,7 @@ export function createEditorSnapshot(canvas: Canvas, sizeId: CanvasSizeId): Edit
  * 스냅샷을 캔버스에 복원한 뒤 좌표/렌더를 재계산한다.
  * @param {Canvas} canvas - Fabric 캔버스
  * @param {string} canvasJson - 직렬화된 JSON 문자열
+ * @param {CanvasSizeId} [sizeId]
  * @returns {Promise<void>}
  */
 export async function applyCanvasJson(
@@ -43,7 +62,10 @@ export async function applyCanvasJson(
   canvasJson: string,
   sizeId?: CanvasSizeId,
 ): Promise<void> {
-  const parsed = JSON.parse(canvasJson) as object
+  const parsed = JSON.parse(canvasJson) as {
+    activeLayerIds?: string[]
+  } & object
+  const activeLayerIds = Array.isArray(parsed.activeLayerIds) ? parsed.activeLayerIds : []
   await canvas.loadFromJSON(parsed)
 
   canvas.getObjects().forEach((object) => {
@@ -68,6 +90,21 @@ export async function applyCanvasJson(
   normalizeCanvasTextObjects(canvas, artboard)
 
   canvas.discardActiveObject()
+  if (activeLayerIds.length > 0) {
+    const matched = canvas
+      .getObjects()
+      .filter((object) => {
+        const id = (object as LayerAwareObject).layerId
+        return id != null && activeLayerIds.includes(id)
+      })
+    if (matched.length === 1) {
+      canvas.setActiveObject(matched[0]!)
+    } else if (matched.length > 1) {
+      const selection = new ActiveSelection(matched, { canvas })
+      canvas.setActiveObject(selection)
+    }
+  }
+
   canvas.calcOffset()
   canvas.requestRenderAll()
 }

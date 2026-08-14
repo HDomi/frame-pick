@@ -79,22 +79,30 @@
 - 자체 SVG + Fluent Emoji Flat(MIT) 서브셋
 - SVG는 `loadSVGFromURL` 경로로 로드 (빈 이미지 이슈 회피)
 
-### 저장·히스토리
+### 저장·히스토리·프로젝트
 - 1분 자동 임시저장 + 헤더 카운트다운 / 수동 임시저장 / 초기화
 - Undo / Redo (최대 20스텝, Ctrl/Cmd+Z · Shift+Z)
-- 스키마: `projects` / `pages` / `workspace_state` + drafts·history  
-  (다중 프로젝트·페이지 **UI는 추후**)
+  - 스텝에 **label/command_type** 기록, 드래그 제스처는 `modified` 1회로 병합
+  - undo/redo 후 **선택(layerId) 복원**
+- **다중 프로젝트·페이지 UI** (헤더 스위처) — 스키마 `projects` / `pages` / `workspace_state`
 
-### 레이아웃·UX·법적 페이지
+### 정렬·스냅
+- 객체 이동 시 아트보드 가장자리·중앙·이웃 객체에 **스냅 + 가이드선**
+
+### 업로드 제한
+- 일반 이미지: **25MB 초과 거부**, 10MB 이상 경고
+- 누끼 입력 15MB·영상 200MB 경고 (기존)
+
+### 레이아웃·UX·SEO·법적 페이지
 - **md 이상**: 전체 편집 여백 + 좌·우 패널 오버레이, 패널 % 리사이즈(선호값 DB 저장)
 - **md 미만**: 하단 시트형 툴바 (도구 / 레이어 / 스타일)
 - 전역 로딩 오버레이 + 상단 중앙 토스트
 - 햄버거 메뉴 → `/terms` · `/licenses` · `/privacy`
+- **OG 이미지** (`public/og-image.png`) + metadata · `robots.txt` · `sitemap.xml`
+- 캔버스 `aria-label`, `:focus-visible` 링, muted 대비 보강
 
 ### 아직 stub / 미구현
 - 다운로드 광고 타이머·AdSense/AdFit 실연동
-- OG 이미지·Lighthouse 마감
-- 다중 프로젝트·페이지 UI
 - 곡선 텍스트 (백로그)
 - (선택) PWA
 

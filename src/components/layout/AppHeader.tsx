@@ -6,6 +6,7 @@ import UndoIcon from '@mui/icons-material/Undo'
 import { ExportDialog } from '@/components/export/ExportDialog'
 import { PreviewModal } from '@/components/preview/PreviewModal'
 import { HeaderMenu } from '@/components/layout/HeaderMenu'
+import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher'
 import { Button, HelpTip, IconButton } from '@/components/ui'
 import { useEditorSession } from '@/contexts/EditorSessionContext'
 import { useLoading } from '@/contexts/LoadingContext'
@@ -125,33 +126,31 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4">
-        <div className="flex min-w-0 items-center gap-2">
-          <HeaderMenu />
-          <span className="text-lg font-bold tracking-tight text-[var(--color-text)]">
-            Frame Pick
-          </span>
-          <HelpTip />
-          <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">
-            유튜브 썸네일 에디터
-          </span>
-          {isHydrated ? (
-            <span
-              className="hidden text-[11px] text-[var(--color-text-muted)] md:inline"
-              title="최근 임시저장 · 다음 자동저장까지"
-            >
-              {lastSavedAt ? `저장 ${formatSavedAt(lastSavedAt)}` : '미저장'}
-              {nextAutoSaveAt ? (
-                <>
-                  {' · '}
-                  자동 {isSaving ? '저장 중…' : formatCountdown(autoSaveRemainingMs)}
-                </>
-              ) : null}
+      <header className="flex shrink-0 flex-col gap-1 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 sm:px-4">
+        <div className="flex h-10 items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <HeaderMenu />
+            <span className="shrink-0 text-lg font-bold tracking-tight text-[var(--color-text)]">
+              Frame Pick
             </span>
-          ) : null}
-        </div>
+            <HelpTip />
+            {isHydrated ? (
+              <span
+                className="hidden text-[11px] text-[var(--color-text-muted)] md:inline"
+                title="최근 임시저장 · 다음 자동저장까지"
+              >
+                {lastSavedAt ? `저장 ${formatSavedAt(lastSavedAt)}` : '미저장'}
+                {nextAutoSaveAt ? (
+                  <>
+                    {' · '}
+                    자동 {isSaving ? '저장 중…' : formatCountdown(autoSaveRemainingMs)}
+                  </>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
           <IconButton
             label="실행 취소 (Ctrl+Z)"
             disabled={!controlsEnabled || !canUndo}
@@ -203,6 +202,10 @@ export function AppHeader() {
           >
             다운로드
           </Button>
+          </div>
+        </div>
+        <div className="overflow-x-auto pb-0.5">
+          <WorkspaceSwitcher />
         </div>
       </header>
 
